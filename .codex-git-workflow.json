@@ -1,0 +1,49 @@
+{
+  "repository": "dasddfdfasd-cmyk/OfferCrash",
+  "remote": "origin",
+  "workingBranch": "frontend",
+  "pullRequestBase": "main",
+  "defaultBuildCommand": "npm run build",
+  "commands": {
+    "uploadChanges": [
+      "git status --short --branch",
+      "npm run build",
+      "git add .",
+      "git commit -m \"<message>\"",
+      "git push origin frontend"
+    ],
+    "syncFromRemote": [
+      "git status --short --branch",
+      "git pull --ff-only origin frontend",
+      "npm install if package.json or package-lock.json changed",
+      "npm run build"
+    ]
+  },
+  "triggerPhrases": {
+    "uploadChanges": [
+      "上传新增文件",
+      "提交我的修改",
+      "我写好了，上传",
+      "把我新增的文件传上去",
+      "同步到 GitHub"
+    ],
+    "syncFromRemote": [
+      "同步别人上传的文件",
+      "拉取最新",
+      "更新到最新代码",
+      "同步远程",
+      "pull 一下"
+    ]
+  },
+  "safetyRules": [
+    "Never overwrite local uncommitted changes.",
+    "Never run git reset --hard unless explicitly requested.",
+    "Do not commit ignored artifacts such as node_modules, dist, .env files, or logs.",
+    "If the working tree is dirty when syncing remote changes, stop and ask whether to upload, stash, or cancel.",
+    "If build fails during upload, do not commit until the failure is fixed or the user explicitly decides otherwise."
+  ],
+  "notes": [
+    "If a pull request from frontend to main already exists, pushing to frontend updates it automatically.",
+    "GitHub CLI may not be installed on this machine, so PR creation can be done manually from the compare URL."
+  ]
+}
