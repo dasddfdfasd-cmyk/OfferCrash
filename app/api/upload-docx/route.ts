@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { parseDocxToText } from "../../../lib/docx";
+import { parseDocxToText } from "@/lib/docx";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -33,8 +33,7 @@ export async function POST(request: Request) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
-    const rawText = await parseDocxToText(fileBuffer);
+    const rawText = await parseDocxToText(Buffer.from(arrayBuffer));
 
     return NextResponse.json({
       success: true,
@@ -48,10 +47,7 @@ export async function POST(request: Request) {
         : "DOCX 解析失败";
 
     return NextResponse.json(
-      {
-        success: false,
-        error: message || "DOCX 解析失败",
-      },
+      { success: false, error: message },
       { status: 500 },
     );
   }

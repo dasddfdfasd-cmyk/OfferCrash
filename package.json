@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "preview": "next start"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",

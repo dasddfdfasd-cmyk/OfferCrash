@@ -16,9 +16,9 @@ import {
   getCompanyStyle,
   getReport,
   readText,
-} from "../../components/offercrash-shared";
-import { mockReport } from "../../lib/mockData";
-import type { CompanyStyle, InterviewReport } from "../../types/interview";
+} from "@/components/offercrash-shared";
+import { mockReport } from "@/lib/mockData";
+import type { CompanyStyle, InterviewReport } from "@/types/interview";
 
 const scoreLabels: Record<keyof InterviewReport["dimensionScores"], string> = {
   structuredExpression: "结构化表达",
@@ -41,43 +41,69 @@ export default function ReportPage() {
     setCompanyStyle(getCompanyStyle());
   }, []);
 
-  const scores = Object.entries(report.dimensionScores) as Array<[
-    keyof InterviewReport["dimensionScores"],
-    number,
-  ]>;
+  const scores = Object.entries(report.dimensionScores) as Array<
+    [keyof InterviewReport["dimensionScores"], number]
+  >;
 
   return (
     <AppFrame>
       <PageShell>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 18,
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
           <div>
             <Tag>诊断报告</Tag>
-            <h1 style={{ color: "#111827", fontSize: 40, marginBottom: 8 }}>产品经理校招面试诊断报告</h1>
-            <p className="oc-muted">{selected.label}｜面试时长已记录｜共 6 轮追问</p>
+            <h1 style={{ color: "#111827", fontSize: 40, marginBottom: 8 }}>
+              产品经理校招面试诊断报告
+            </h1>
+            <p className="oc-muted">{selected.label} · 共 6 轮追问</p>
           </div>
           <div className="oc-actions" style={{ marginTop: 0 }}>
-            <SecondaryButton href="/" icon={<HomeIcon />}>返回首页</SecondaryButton>
-            <PrimaryButton href="/meeting" icon={<RestartIcon />}>再来一轮</PrimaryButton>
+            <SecondaryButton href="/" icon={<HomeIcon />}>
+              返回首页
+            </SecondaryButton>
+            <PrimaryButton href="/meeting" icon={<RestartIcon />}>
+              再来一轮
+            </PrimaryButton>
           </div>
         </div>
 
         {showFallbackNotice && (
-          <div className="oc-alert">报告生成服务异常，已使用演示报告继续流程。</div>
+          <div className="oc-alert">
+            报告生成服务异常，已使用演示报告继续流程。
+          </div>
         )}
 
         <section className="oc-report-grid">
           <Card style={{ padding: 24 }}>
             <p style={{ color: "#2563eb", fontWeight: 800 }}>综合评级</p>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 22 }}>
-              <span style={{ color: "#111827", fontSize: 76, fontWeight: 900 }}>{report.overallGrade}</span>
+              <span style={{ color: "#111827", fontSize: 76, fontWeight: 900 }}>
+                {report.overallGrade}
+              </span>
               <div style={{ paddingBottom: 12 }}>
                 <p style={{ color: "#2563eb", fontSize: 24, fontWeight: 900 }}>
                   进入下一轮概率：{report.passProbability}%
                 </p>
-                <p style={{ color: "#111827", fontWeight: 800 }}>被刷风险：{report.eliminationRisk}</p>
+                <p style={{ color: "#111827", fontWeight: 800 }}>
+                  被刷风险：{report.eliminationRisk}
+                </p>
               </div>
             </div>
-            <p style={{ borderRadius: 16, background: "#eff6ff", padding: 16, lineHeight: 1.8 }}>
+            <p
+              style={{
+                borderRadius: 16,
+                background: "#eff6ff",
+                padding: 16,
+                lineHeight: 1.8,
+              }}
+            >
               {report.oneSentenceFeedback}
             </p>
           </Card>
@@ -104,11 +130,31 @@ export default function ReportPage() {
           <Card style={{ padding: 24 }}>
             <h2 style={{ color: "#111827" }}>核心崩点分析</h2>
             {report.keyBreakpoints.map((item, index) => (
-              <div key={item.title} style={{ border: "1px solid #dde7f8", borderRadius: 16, background: "#f7fafc", padding: 18, marginTop: 14 }}>
-                <h3 style={{ color: "#111827" }}>{index + 1}. {item.title}</h3>
-                <p><strong>影响：</strong>{item.impact}</p>
-                <p><strong>证据：</strong>{item.evidence}</p>
-                <p><strong>建议：</strong>{item.suggestion}</p>
+              <div
+                key={item.title}
+                style={{
+                  border: "1px solid #dde7f8",
+                  borderRadius: 16,
+                  background: "#f7fafc",
+                  padding: 18,
+                  marginTop: 14,
+                }}
+              >
+                <h3 style={{ color: "#111827" }}>
+                  {index + 1}. {item.title}
+                </h3>
+                <p>
+                  <strong>影响：</strong>
+                  {item.impact}
+                </p>
+                <p>
+                  <strong>证据：</strong>
+                  {item.evidence}
+                </p>
+                <p>
+                  <strong>建议：</strong>
+                  {item.suggestion}
+                </p>
               </div>
             ))}
           </Card>
@@ -128,7 +174,9 @@ export default function ReportPage() {
           </Card>
           <Card style={{ padding: 24 }}>
             <h2 style={{ color: "#111827" }}>下一轮训练建议</h2>
-            <p style={{ lineHeight: 1.8 }}>下一轮建议重点训练：{report.nextTrainingPlan.focus}</p>
+            <p style={{ lineHeight: 1.8 }}>
+              下一轮建议重点训练：{report.nextTrainingPlan.focus}
+            </p>
             <strong style={{ color: "#111827" }}>你需要准备：</strong>
             <ol style={{ lineHeight: 1.9 }}>
               {report.nextTrainingPlan.tasks.map((task) => (
@@ -144,7 +192,15 @@ export default function ReportPage() {
 
 function ReportBlock({ label, text }: { label: string; text: string }) {
   return (
-    <div style={{ border: "1px solid #dde7f8", borderRadius: 14, background: "#f7fafc", padding: 14, marginTop: 12 }}>
+    <div
+      style={{
+        border: "1px solid #dde7f8",
+        borderRadius: 14,
+        background: "#f7fafc",
+        padding: 14,
+        marginTop: 12,
+      }}
+    >
       <p style={{ color: "#2563eb", fontWeight: 800, marginTop: 0 }}>{label}</p>
       <p style={{ lineHeight: 1.8 }}>{text}</p>
     </div>

@@ -21,34 +21,28 @@ import {
   useGoProfileWithMock,
   writeJson,
   writeText,
-} from "../../components/offercrash-shared";
-import { mockCandidateProfile } from "../../lib/mockData";
-import type { CandidateProfile } from "../../types/interview";
+} from "@/components/offercrash-shared";
+import { mockCandidateProfile } from "@/lib/mockData";
+import type { CandidateProfile } from "@/types/interview";
 
-const loadingLines = ["正在读取 DOCX...", "正在提取项目经历...", "正在生成候选人面试档案..."];
+const loadingLines = [
+  "正在读取 DOCX...",
+  "正在提取项目经历...",
+  "正在生成候选人面试档案...",
+];
 
 type UploadResponse = {
   success?: boolean;
   rawText?: string;
-  data?: { rawText?: string };
-  error?: string | { message?: string };
-  message?: string;
+  error?: string;
 };
 
 type ExtractResponse = {
   success?: boolean;
   fallback?: boolean;
   candidateProfile?: CandidateProfile;
-  data?: { candidateProfile?: CandidateProfile; fallback?: boolean };
-  error?: string | { message?: string };
-  message?: string;
+  error?: string;
 };
-
-function getErrorMessage(data: UploadResponse | ExtractResponse, fallback: string) {
-  if (typeof data.error === "string") return data.error;
-  if (data.error?.message) return data.error.message;
-  return data.message || fallback;
-}
 
 export default function UploadPage() {
   const router = useRouter();
@@ -104,7 +98,6 @@ export default function UploadPage() {
     const stopLoading = runLoading();
 
     try {
-      let rawText = "";
       let candidateProfile = mockCandidateProfile;
       let fallback = isDemoMode();
 
@@ -118,27 +111,25 @@ export default function UploadPage() {
         });
         const uploadData = (await uploadResponse.json().catch(() => ({}))) as UploadResponse;
 
-        if (!uploadResponse.ok || uploadData.success !== true) {
-          throw new Error(getErrorMessage(uploadData, "DOCX 上传解析失败，请稍后重试。"));
+        if (!uploadResponse.ok || uploadData.success !== true || !uploadData.rawText) {
+          throw new Error(uploadData.error || "DOCX 上传解析失败，请稍后重试。");
         }
 
-        rawText = uploadData.rawText ?? uploadData.data?.rawText ?? "";
-        writeText(STORAGE_KEYS.rawText, rawText);
+        writeText(STORAGE_KEYS.rawText, uploadData.rawText);
 
         const extractResponse = await fetch("/api/extract-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rawText }),
+          body: JSON.stringify({ rawText: uploadData.rawText }),
         });
         const extractData = (await extractResponse.json().catch(() => ({}))) as ExtractResponse;
 
         if (!extractResponse.ok || extractData.success !== true) {
-          throw new Error(getErrorMessage(extractData, DEMO_NOTICE));
+          throw new Error(extractData.error || DEMO_NOTICE);
         }
 
-        candidateProfile =
-          extractData.candidateProfile ?? extractData.data?.candidateProfile ?? mockCandidateProfile;
-        fallback = Boolean(extractData.fallback ?? extractData.data?.fallback);
+        candidateProfile = extractData.candidateProfile ?? mockCandidateProfile;
+        fallback = Boolean(extractData.fallback);
       }
 
       writeJson(STORAGE_KEYS.candidateProfile, candidateProfile);
@@ -147,7 +138,7 @@ export default function UploadPage() {
     } catch (uploadError) {
       console.error(uploadError);
       setError(DEMO_NOTICE);
-      setNotice("你仍可以点击“使用示例简历体验”继续完整流程。");
+      setNotice("你仍然可以点击“使用示例简历体验”继续完整流程。");
     } finally {
       stopLoading();
       setLoadingLine("");
@@ -160,7 +151,9 @@ export default function UploadPage() {
         <BackToHome />
         <div style={{ marginTop: 22, textAlign: "center" }}>
           <Tag>DOCX 简历解析</Tag>
-          <h1 style={{ color: "#111827", fontSize: 40, marginBottom: 12 }}>上传 DOCX 简历 / 项目经历</h1>
+          <h1 style={{ color: "#111827", fontSize: 40, marginBottom: 12 }}>
+            上传 DOCX 简历 / 项目经历
+          </h1>
           <p className="oc-muted" style={{ lineHeight: 1.8 }}>
             请上传 .docx 文件，建议包含教育背景、实习经历、项目经历、负责内容和项目结果。
           </p>
@@ -175,11 +168,16 @@ export default function UploadPage() {
             onChange={onFileChange}
           />
           <button className="oc-upload-drop" disabled={isUploading} onClick={chooseFile}>
-            <span className="oc-logo" style={{ width: 64, height: 64, background: "#fff", color: "#2563eb" }}>
+            <span
+              className="oc-logo"
+              style={{ width: 64, height: 64, background: "#fff", color: "#2563eb" }}
+            >
               <UploadIcon />
             </span>
             <h2 style={{ marginTop: 22 }}>拖拽 DOCX 到这里，或点击选择文件</h2>
-            <p className="oc-muted">{selectedFile ? `已选择：${selectedFile.name}` : "仅支持 .docx 文件"}</p>
+            <p className="oc-muted">
+              {selectedFile ? `已选择：${selectedFile.name}` : "仅支持 .docx 文件"}
+            </p>
           </button>
 
           <div className="oc-actions" style={{ justifyContent: "center" }}>
@@ -200,7 +198,7 @@ export default function UploadPage() {
             <Card className="oc-modal" style={{ textAlign: "center" }}>
               <RefreshCw className="spin" color="#2563eb" size={34} />
               <h2 style={{ color: "#111827" }}>{loadingLine}</h2>
-              <p className="oc-muted">阶段 2 暂时完成 DOCX 读取，后续分析会自动兜底。</p>
+              <p className="oc-muted">解析失败时会自动提示使用示例简历继续体验。</p>
             </Card>
           </div>
         )}

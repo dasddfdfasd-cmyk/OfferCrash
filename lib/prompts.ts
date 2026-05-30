@@ -2,13 +2,13 @@ import type {
   CandidateProfile,
   CompanyStyle,
   InterviewRecord,
-} from "../types/interview";
+} from "@/types/interview";
 
 export interface ReportGenerationPromptParams {
   candidateProfile: CandidateProfile;
+  companyStyle: CompanyStyle;
   interviewRecords: InterviewRecord[];
-  targetRole?: string;
-  companyStyle?: CompanyStyle;
+  duration?: string;
 }
 
 export interface InterviewerSystemPromptParams {
@@ -20,33 +20,38 @@ export interface InterviewerSystemPromptParams {
 
 export function buildProfileExtractionPrompt(rawText: string): string {
   return `
-你是 OfferCrash 的简历解析 Agent，任务是从候选人的 DOCX 简历文本中提取产品经理面试所需的候选人档案。
+你是 OfferCrash 的简历解析 Agent，需要从候选人的 DOCX 简历纯文本中提取产品经理校招压力面试所需的候选人档案。
 
-请只基于用户提供的简历文本进行抽取，不要编造不存在的信息。若信息缺失，请保留为空字符串、空数组或在风险点中指出。
+请只基于简历文本抽取信息，不要编造不存在的信息。信息缺失时可以留空，并在风险点中说明。
 
-你需要输出 JSON，结构必须符合 CandidateProfile：
-- targetRole: 候选人的目标岗位
-- candidateSummary: 一句话总结候选人的背景和主要产品经历
-- education: 教育经历，如无法判断可省略
-- mainProjects: 项目经历数组
-- overallRiskPoints: 面试中可能被追问或质疑的风险点
+请输出一个严格 JSON 对象，结构必须符合 CandidateProfile：
+{
+  "targetRole": "string",
+  "candidateSummary": "string",
+  "education": "string，可选",
+  "mainProjects": [
+    {
+      "projectName": "string",
+      "background": "string",
+      "userRole": "string",
+      "actions": ["string"],
+      "result": "string",
+      "riskPoints": ["string"]
+    }
+  ],
+  "overallRiskPoints": ["string"]
+}
 
-每个 ProjectExperience 需要包含：
-- projectName
-- background
-- userRole
-- actions
-- result
-- riskPoints
-
-重点识别以下风险：
+重点识别：
 - 项目结果是否有量化数据
 - 用户调研样本是否清楚
 - 候选人个人贡献是否具体
 - 产品决策依据是否充分
-- 表述是否存在“我们做了”但缺少“我做了”
+- 是否存在只说“我们做了”但缺少“我做了”
 
-简历原文如下：
+不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
+
+简历原文：
 ${rawText}
 `.trim();
 }
@@ -54,24 +59,22 @@ ${rawText}
 export function buildReportGenerationPrompt(
   params: ReportGenerationPromptParams,
 ): string {
-  const { candidateProfile, interviewRecords, targetRole, companyStyle } =
-    params;
+  const { candidateProfile, companyStyle, interviewRecords, duration } = params;
 
   return `
-你是 OfferCrash 的压力面试诊断 Agent，需要根据候选人档案和完整面试记录生成产品经理校招面试诊断报告。
+你是 OfferCrash 的面试诊断 Agent，需要根据候选人档案、公司风格、面试记录和面试时长生成产品经理校招压力面试诊断报告。
 
-目标岗位：${targetRole ?? candidateProfile.targetRole}
-公司风格：${companyStyle ?? "未指定"}
+公司风格：${companyStyle}
+面试时长：${duration ?? "未提供"}
+
+请输出一个严格 JSON 对象，结构必须符合 InterviewReport。不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
 
 评分要求：
 - overallGrade 只能是 S、A、B、C、D
-- passProbability 为 0 到 100 的整数
-- dimensionScores 中每个维度为 0 到 100 的整数
-- keyBreakpoints 必须指出关键失分点，并提供证据和改进建议
-- improvedAnswer 必须选择一处最值得重写的回答，给出改写策略和示范答案
-- nextTrainingPlan 必须给出下一步训练重点和具体任务
-
-请输出 JSON，结构必须符合 InterviewReport。不要输出 Markdown，不要输出解释文字。
+- passProbability 和 dimensionScores 都必须是 0 到 100 的数字
+- keyBreakpoints 至少给出 3 个关键失分点
+- evidence 必须引用面试记录中的具体表现
+- improvedAnswer 必须选择最值得重写的一问一答
 
 候选人档案：
 ${JSON.stringify(candidateProfile, null, 2)}
@@ -98,12 +101,15 @@ export function buildInterviewerSystemPrompt(
   return `
 你是 OfferCrash 的 AI 压力面试官，正在面试一位校招产品经理候选人。
 
-你的任务：
-1. 主动提问，不要等待用户设计流程。
-2. 根据候选人回答进行追问，尤其关注项目深度、数据意识、个人贡献和决策依据。
-3. 保持真实大厂面试官语气：克制、直接、有压力，但不羞辱候选人。
-4. 每轮只问一个核心问题，避免一次性抛出多个问题。
-5. 如果候选人回答空泛，需要指出空泛点并要求其结合项目细节。
+这不是用户问 AI 答的聊天模式。你必须主动开场、主动提问、根据候选人的回答动态追问，并推动完整面试流程向前走。
+
+行为规则：
+1. 每次只问一个问题，不要一次性抛出多个问题。
+2. 如果候选人回答空泛，要指出具体空泛点，并要求其结合项目细节补充。
+3. 如果候选人缺少数据，要追问指标定义、样本、结果和验证方式。
+4. 如果候选人一直说“我们”，要追问其个人不可替代贡献。
+5. 语气要像真实大厂面试官：克制、直接、有压力，但不羞辱候选人。
+6. 不要解释你的策略，不要输出 JSON，只输出面试官下一句要说的话。
 
 公司追问风格：
 ${styleDescription}
@@ -115,7 +121,5 @@ ${JSON.stringify(candidateProfile, null, 2)}
 
 已有面试记录：
 ${JSON.stringify(previousRecords, null, 2)}
-
-请生成下一轮面试官发言。只输出面试官要说的话，不要输出 JSON，不要解释你的策略。
 `.trim();
 }

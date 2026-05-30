@@ -14,12 +14,13 @@ import {
   getCandidateProfile,
   getCompanyStyle,
   writeText,
-} from "../../components/offercrash-shared";
-import type { CandidateProfile, CompanyStyle } from "../../types/interview";
-import { mockCandidateProfile } from "../../lib/mockData";
+} from "@/components/offercrash-shared";
+import { mockCandidateProfile } from "@/lib/mockData";
+import type { CandidateProfile, CompanyStyle } from "@/types/interview";
 
 export default function ConfigPage() {
-  const [selectedCompany, setSelectedCompany] = useState<CompanyStyle>("bytedance");
+  const [selectedCompany, setSelectedCompany] =
+    useState<CompanyStyle>("bytedance");
   const [profile, setProfile] = useState<CandidateProfile>(mockCandidateProfile);
 
   useEffect(() => {
@@ -36,11 +37,15 @@ export default function ConfigPage() {
     <AppFrame>
       <PageShell>
         <Tag>面试配置</Tag>
-        <h1 style={{ color: "#111827", fontSize: 40, marginBottom: 8 }}>面试配置</h1>
-        <p className="oc-muted">岗位：{profile.targetRole}校招 / 实习</p>
+        <h1 style={{ color: "#111827", fontSize: 40, marginBottom: 8 }}>
+          面试配置
+        </h1>
+        <p className="oc-muted">岗位：{profile.targetRole} 校招 / 实习</p>
 
         <div className="oc-config-grid">
-          {(Object.entries(companyProfiles) as Array<[CompanyStyle, typeof companyProfiles.bytedance]>).map(([key, item]) => {
+          {(Object.entries(companyProfiles) as Array<
+            [CompanyStyle, (typeof companyProfiles)["bytedance"]]
+          >).map(([key, item]) => {
             const active = key === selectedCompany;
             return (
               <button
@@ -53,9 +58,21 @@ export default function ConfigPage() {
                   {active && <Check color="#2563eb" size={22} />}
                 </div>
                 <p style={{ lineHeight: 1.8 }}>特点：{item.traits}</p>
-                <div style={{ border: "1px solid #dde7f8", borderRadius: 14, background: "#fff", padding: 14, marginTop: 16 }}>
-                  <p style={{ color: "#2563eb", fontSize: 12, fontWeight: 800, margin: 0 }}>典型追问</p>
-                  <p style={{ color: "#111827", fontWeight: 700 }}>“{item.question}”</p>
+                <div
+                  style={{
+                    border: "1px solid #dde7f8",
+                    borderRadius: 14,
+                    background: "#fff",
+                    padding: 14,
+                    marginTop: 16,
+                  }}
+                >
+                  <p style={{ color: "#2563eb", fontSize: 12, fontWeight: 800, margin: 0 }}>
+                    典型追问
+                  </p>
+                  <p style={{ color: "#111827", fontWeight: 700 }}>
+                    “{item.question}”
+                  </p>
                 </div>
               </button>
             );
@@ -83,8 +100,17 @@ export default function ConfigPage() {
 
 function Setting({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ border: "1px solid #dde7f8", borderRadius: 14, background: "#f7fafc", padding: 16 }}>
-      <p className="oc-muted" style={{ fontSize: 12, fontWeight: 800, margin: 0 }}>{label}</p>
+    <div
+      style={{
+        border: "1px solid #dde7f8",
+        borderRadius: 14,
+        background: "#f7fafc",
+        padding: 16,
+      }}
+    >
+      <p className="oc-muted" style={{ fontSize: 12, fontWeight: 800, margin: 0 }}>
+        {label}
+      </p>
       <strong style={{ color: "#111827" }}>{value}</strong>
     </div>
   );

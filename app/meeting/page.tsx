@@ -24,7 +24,6 @@ import {
 
 import {
   Card,
-  DEMO_NOTICE,
   PrimaryButton,
   SecondaryButton,
   STORAGE_KEYS,
@@ -34,20 +33,21 @@ import {
   isDemoMode,
   writeJson,
   writeText,
-} from "../../components/offercrash-shared";
-import { mockCandidateProfile, mockInterviewTurns, mockReport } from "../../lib/mockData";
+} from "@/components/offercrash-shared";
+import { mockCandidateProfile, mockInterviewTurns, mockReport } from "@/lib/mockData";
 import type {
   CandidateProfile,
   CompanyStyle,
   InterviewRecord,
   InterviewReport,
   MeetingStatus,
-} from "../../types/interview";
+} from "@/types/interview";
 
 type ReportResponse = {
   success?: boolean;
   report?: InterviewReport;
-  data?: { report?: InterviewReport };
+  fallback?: boolean;
+  error?: string;
 };
 
 function formatClock(totalSeconds: number) {
@@ -102,7 +102,7 @@ export default function MeetingPage() {
   }, [currentTurn.ai, meetingStatus, ttsEnabled]);
 
   const statusText: Record<MeetingStatus, string> = {
-    device_check: "设备检测",
+    device_check: "设备检查",
     ai_speaking: "AI 正在提问",
     user_answering: "用户正在回答",
     ai_thinking: "AI 正在分析",
@@ -117,7 +117,8 @@ export default function MeetingPage() {
       setMeetingStatus("generating_report");
       setShowEndConfirm(false);
 
-      const candidateProfile: CandidateProfile = getCandidateProfile() ?? mockCandidateProfile;
+      const candidateProfile: CandidateProfile =
+        getCandidateProfile() ?? mockCandidateProfile;
       const duration = formatClock(elapsedTime);
       let report = mockReport;
       let fallback = isDemoMode();
@@ -137,11 +138,11 @@ export default function MeetingPage() {
           const data = (await response.json().catch(() => ({}))) as ReportResponse;
 
           if (!response.ok || data.success !== true) {
-            throw new Error("report generation failed");
+            throw new Error(data.error || "report generation failed");
           }
 
-          report = data.report ?? data.data?.report ?? mockReport;
-          fallback = false;
+          report = data.report ?? mockReport;
+          fallback = Boolean(data.fallback);
         }
       } catch (error) {
         console.error(error);
@@ -207,8 +208,10 @@ export default function MeetingPage() {
             <MonitorUp size={17} />
           </span>
           <strong>会议详情</strong>
-          <span className="oc-muted">⌛ {formatClock(elapsedTime)}（40分钟）</span>
-          <span className="oc-muted">产品经理压力面试会议室｜{selected.meetingLabel}</span>
+          <span className="oc-muted">{formatClock(elapsedTime)}</span>
+          <span className="oc-muted">
+            产品经理压力面试会议室 | {selected.meetingLabel}
+          </span>
           <Wifi size={17} color="#10b981" />
           <ShieldCheck size={17} color="#2563eb" />
           <Volume2 size={17} color="#6b7280" />
@@ -230,7 +233,9 @@ export default function MeetingPage() {
               <strong>当前问题</strong>
               <span className="oc-tag">{currentTurn.type}</span>
             </div>
-            <p style={{ color: "#111827", lineHeight: 1.8, fontWeight: 700 }}>{questionText}</p>
+            <p style={{ color: "#111827", lineHeight: 1.8, fontWeight: 700 }}>
+              {questionText}
+            </p>
           </div>
 
           <div className="oc-members">
@@ -238,40 +243,90 @@ export default function MeetingPage() {
               active={meetingStatus === "ai_speaking"}
               name="David"
               role="AI 面试官"
-              status={meetingStatus === "ai_speaking" ? "正在提问" : meetingStatus === "ai_thinking" ? "正在分析" : selected.interviewer}
+              status={
+                meetingStatus === "ai_speaking"
+                  ? "正在提问"
+                  : meetingStatus === "ai_thinking"
+                    ? "正在分析"
+                    : selected.interviewer
+              }
             />
             <MeetingMember
               active={meetingStatus === "user_answering"}
               candidate
               name="我是谁"
               role="候选人 / 你"
-              status={meetingStatus === "user_answering" ? "正在回答 · 00:42" : "等待回答"}
+              status={meetingStatus === "user_answering" ? "正在回答" : "等待回答"}
             />
           </div>
 
-          <div style={{ position: "absolute", bottom: 22, left: "50%", transform: "translateX(-50%)", border: "1px solid #e5e7eb", borderRadius: 999, background: "#fff", padding: "8px 14px", color: "#6b7280", boxShadow: "0 8px 20px rgba(17,24,39,.06)" }}>
-            {statusText[meetingStatus]} ｜ 第 {currentTurnIndex + 1}/{mockInterviewTurns.length} 轮
+          <div
+            style={{
+              position: "absolute",
+              bottom: 22,
+              left: "50%",
+              transform: "translateX(-50%)",
+              border: "1px solid #e5e7eb",
+              borderRadius: 999,
+              background: "#fff",
+              padding: "8px 14px",
+              color: "#6b7280",
+              boxShadow: "0 8px 20px rgba(17,24,39,.06)",
+            }}
+          >
+            {statusText[meetingStatus]} · 第 {currentTurnIndex + 1}/
+            {mockInterviewTurns.length} 轮
           </div>
           {fallbackNotice && (
-            <div className="oc-alert" style={{ position: "absolute", bottom: 74, left: "50%", transform: "translateX(-50%)" }}>
+            <div
+              className="oc-alert"
+              style={{
+                position: "absolute",
+                bottom: 74,
+                left: "50%",
+                transform: "translateX(-50%)",
+              }}
+            >
               {fallbackNotice}
             </div>
           )}
         </section>
 
         <aside className="oc-record-panel">
-          <div style={{ height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e7eb", padding: "0 20px" }}>
-            <strong style={{ color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              height: 64,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderBottom: "1px solid #e5e7eb",
+              padding: "0 20px",
+            }}
+          >
+            <strong
+              style={{ color: "#111827", display: "flex", alignItems: "center", gap: 8 }}
+            >
               <ClipboardList size={20} />
               面试实时记录
             </strong>
             <X size={18} color="#6b7280" />
           </div>
-          <div style={{ borderBottom: "1px solid #e5e7eb", background: "#f4f7ff", color: "#2563eb", padding: "12px 20px" }}>
-            ⏱ 面试开始 {formatClock(77)}
+          <div
+            style={{
+              borderBottom: "1px solid #e5e7eb",
+              background: "#f4f7ff",
+              color: "#2563eb",
+              padding: "12px 20px",
+            }}
+          >
+            面试开始 {formatClock(77)}
           </div>
           <div className="oc-record-list">
-            {interviewRecords.length === 0 && <p className="oc-muted">进入面试后，AI 会主动开场并生成记录。</p>}
+            {interviewRecords.length === 0 && (
+              <p className="oc-muted">
+                进入面试后，AI 会主动开场并生成记录。
+              </p>
+            )}
             {interviewRecords.map((record, index) => (
               <article className="oc-record" key={`${record.role}-${record.roundIndex}-${index}`}>
                 <span className={`oc-record-dot ${record.role === "user" ? "is-user" : ""}`} />
@@ -286,11 +341,27 @@ export default function MeetingPage() {
             ))}
           </div>
           <div style={{ borderTop: "1px solid #e5e7eb", padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #e5e7eb", borderRadius: 10, background: "#f9fafb", padding: "8px 10px" }}>
-              <input disabled placeholder="请输入消息..." style={{ flex: 1, border: 0, background: "transparent", outline: "none" }} />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                background: "#f9fafb",
+                padding: "8px 10px",
+              }}
+            >
+              <input
+                disabled
+                placeholder="请输入消息..."
+                style={{ flex: 1, border: 0, background: "transparent", outline: "none" }}
+              />
               <Send size={17} color="#6b7280" />
             </div>
-            <p className="oc-muted" style={{ fontSize: 12 }}>实时记录将用于面试评估，请如实作答。</p>
+            <p className="oc-muted" style={{ fontSize: 12 }}>
+              实时记录将用于面试评估，请如实作答。
+            </p>
           </div>
         </aside>
       </div>
@@ -318,7 +389,16 @@ export default function MeetingPage() {
           className="oc-primary"
           disabled={meetingStatus !== "user_answering"}
           onClick={finishAnswer}
-          style={meetingStatus !== "user_answering" ? { borderColor: "#f3f4f6", background: "#f3f4f6", color: "#6b7280", boxShadow: "none" } : undefined}
+          style={
+            meetingStatus !== "user_answering"
+              ? {
+                  borderColor: "#f3f4f6",
+                  background: "#f3f4f6",
+                  color: "#6b7280",
+                  boxShadow: "none",
+                }
+              : undefined
+          }
         >
           回答完毕
         </button>
@@ -343,7 +423,18 @@ export default function MeetingPage() {
 
 function TopTool({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <button style={{ display: "inline-flex", alignItems: "center", gap: 5, border: 0, borderRadius: 8, background: "transparent", padding: "7px 9px", color: "#6b7280" }}>
+    <button
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        border: 0,
+        borderRadius: 8,
+        background: "transparent",
+        padding: "7px 9px",
+        color: "#6b7280",
+      }}
+    >
       {icon}
       <span>{label}</span>
     </button>
@@ -367,17 +458,48 @@ function MeetingMember({
     <div className="oc-member">
       <div className={`oc-avatar ${active ? "is-active" : ""} ${candidate ? "oc-avatar-candidate" : ""}`}>
         {candidate ? (
-          <strong>是谁</strong>
+          <strong>我</strong>
         ) : (
-          <div style={{ position: "relative", width: "100%", height: "100%", background: "linear-gradient(#f9fafb,#e5e7eb)" }}>
-            <div style={{ position: "absolute", left: 36, top: 20, width: 28, height: 36, borderRadius: "999px 999px 12px 12px", background: "#f3d4c4" }} />
-            <div style={{ position: "absolute", left: 28, bottom: 0, width: 42, height: 42, borderRadius: "18px 18px 0 0", background: "#1f2937" }} />
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              background: "linear-gradient(#f9fafb,#e5e7eb)",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: 36,
+                top: 20,
+                width: 28,
+                height: 36,
+                borderRadius: "999px 999px 12px 12px",
+                background: "#f3d4c4",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                left: 28,
+                bottom: 0,
+                width: 42,
+                height: 42,
+                borderRadius: "18px 18px 0 0",
+                background: "#1f2937",
+              }}
+            />
           </div>
         )}
       </div>
       <p style={{ color: "#111827", fontWeight: 800 }}>{name}</p>
-      <p className="oc-muted" style={{ fontSize: 12 }}>{role}</p>
-      <p className={active ? "oc-tag" : "oc-muted"} style={{ display: "inline-flex", marginTop: 4 }}>{status}</p>
+      <p className="oc-muted" style={{ fontSize: 12 }}>
+        {role}
+      </p>
+      <p className={active ? "oc-tag" : "oc-muted"} style={{ display: "inline-flex", marginTop: 4 }}>
+        {status}
+      </p>
     </div>
   );
 }
@@ -405,9 +527,22 @@ function DeviceModal({ onEnter }: { onEnter: () => void }) {
   return (
     <div className="oc-modal-backdrop">
       <Card className="oc-modal">
-        <h2 style={{ color: "#111827", fontSize: 26 }}>进入面试前，请确认设备状态</h2>
+        <h2 style={{ color: "#111827", fontSize: 26 }}>
+          进入面试前，请确认设备状态
+        </h2>
         {["麦克风：已连接", "语音服务：已连接", "简历档案：已读取"].map((item) => (
-          <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, borderRadius: 14, background: "#eff6ff", padding: 14, marginTop: 12 }}>
+          <div
+            key={item}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              borderRadius: 14,
+              background: "#eff6ff",
+              padding: 14,
+              marginTop: 12,
+            }}
+          >
             <Check size={18} color="#2563eb" />
             <strong style={{ color: "#111827" }}>{item}</strong>
           </div>
@@ -423,11 +558,19 @@ function DeviceModal({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-function ConfirmModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+function ConfirmModal({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
   return (
     <div className="oc-modal-backdrop">
       <Card className="oc-modal">
-        <h2 style={{ color: "#111827" }}>确定结束本轮面试并生成诊断报告吗？</h2>
+        <h2 style={{ color: "#111827" }}>
+          确定结束本轮面试并生成诊断报告吗？
+        </h2>
         <div className="oc-actions">
           <SecondaryButton onClick={onCancel}>继续面试</SecondaryButton>
           <PrimaryButton icon={<ClipboardList size={18} />} onClick={onConfirm}>
