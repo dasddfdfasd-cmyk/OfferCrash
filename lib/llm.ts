@@ -1,21 +1,46 @@
 interface ChatCompletionResponse {
   choices?: Array<{
     message?: {
-      content?: string;
+      content?: string | null;
     };
   }>;
 }
 
-export async function callTextModel(prompt: string): Promise<string> {
-  const apiKey = process.env.TEXT_MODEL_API_KEY;
-  const baseUrl = process.env.TEXT_MODEL_BASE_URL;
-  const modelName = process.env.TEXT_MODEL_NAME;
-
-  if (!apiKey || !baseUrl || !modelName) {
-    throw new Error(
-      "缺少文本模型环境变量：TEXT_MODEL_API_KEY、TEXT_MODEL_BASE_URL 或 TEXT_MODEL_NAME",
-    );
+function buildProviderOptions(baseUrl: string) {
+  if (!baseUrl.includes("aiping.cn")) {
+    return {};
   }
+
+  return {
+    enable_thinking: false,
+    provider: {
+      only: [],
+      order: [],
+      sort: null,
+      input_price_range: [],
+      output_price_range: [],
+      input_length_range: [],
+      output_length_range: [],
+      throughput_range: [],
+      latency_range: [],
+    },
+  };
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+export async function callTextModel(prompt: string): Promise<string> {
+  const apiKey = requireEnv("TEXT_MODEL_API_KEY");
+  const baseUrl = requireEnv("TEXT_MODEL_BASE_URL");
+  const modelName = requireEnv("TEXT_MODEL_NAME");
 
   const endpoint = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
   const response = await fetch(endpoint, {
@@ -26,20 +51,31 @@ export async function callTextModel(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: modelName,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
+      ...buildProviderOptions(baseUrl),
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`文本模型调用失败：${response.status}`);
+    const errorText = await response.text().catch(() => "");
+    throw new Error(
+      `Text model request failed with status ${response.status}${
+        errorText ? `: ${errorText.slice(0, 500)}` : ""
+      }`,
+    );
   }
 
   const data = (await response.json()) as ChatCompletionResponse;
   const content = data.choices?.[0]?.message?.content?.trim();
 
   if (!content) {
-    throw new Error("文本模型返回为空");
+    throw new Error("Text model returned empty assistant content");
   }
 
   return content;

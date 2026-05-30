@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { safeParseJson } from "@/lib/json";
 import { callTextModel } from "@/lib/llm";
 import { mockReport } from "@/lib/mockData";
 import { buildReportGenerationPrompt } from "@/lib/prompts";
-import { safeParseJson } from "@/lib/json";
 import type {
   CandidateProfile,
   CompanyStyle,
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!Array.isArray(body.interviewRecords)) {
+    if (!Array.isArray(body.interviewRecords) || body.interviewRecords.length === 0) {
       return NextResponse.json(
         { success: false, error: "面试记录不能为空" },
         { status: 400 },
@@ -49,18 +49,29 @@ export async function POST(request: Request) {
       });
       const modelText = await callTextModel(prompt);
       const report = safeParseJson<InterviewReport>(modelText, mockReport);
-      const fallback = report === mockReport;
+
+      if (report === mockReport) {
+        return NextResponse.json({
+          success: true,
+          report: mockReport,
+          fallback: true,
+          error: "模型返回内容不是可解析的 InterviewReport JSON",
+        });
+      }
 
       return NextResponse.json({
         success: true,
         report,
-        fallback,
+        fallback: false,
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "面试报告生成失败";
+
       return NextResponse.json({
         success: true,
         report: mockReport,
         fallback: true,
+        error: message,
       });
     }
   } catch {

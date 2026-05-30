@@ -74,3 +74,22 @@ export interface Breakpoint {
   evidence: string;
   suggestion: string;
 }
+
+export interface NextQuestionRequest {
+  candidateProfile: CandidateProfile;
+  companyStyle: CompanyStyle;
+  interviewRecords: InterviewRecord[];
+  currentStage?: string;
+  roundIndex: number;
+}
+
+export interface NextQuestionResponse {
+  success: boolean;
+  nextQuestion: string;
+  stage: string;
+  type: string;
+  reason: string;
+  shouldEnd: boolean;
+  fallback?: boolean;
+  error?: string;
+}

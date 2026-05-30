@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { safeParseJson } from "@/lib/json";
 import { callTextModel } from "@/lib/llm";
 import { mockCandidateProfile } from "@/lib/mockData";
 import { buildProfileExtractionPrompt } from "@/lib/prompts";
-import { safeParseJson } from "@/lib/json";
 import type { CandidateProfile } from "@/types/interview";
 
 export const runtime = "nodejs";
@@ -27,18 +27,29 @@ export async function POST(request: Request) {
         modelText,
         mockCandidateProfile,
       );
-      const fallback = candidateProfile === mockCandidateProfile;
+
+      if (candidateProfile === mockCandidateProfile) {
+        return NextResponse.json({
+          success: true,
+          candidateProfile: mockCandidateProfile,
+          fallback: true,
+          error: "模型返回内容不是可解析的 CandidateProfile JSON",
+        });
+      }
 
       return NextResponse.json({
         success: true,
         candidateProfile,
-        fallback,
+        fallback: false,
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "候选人档案生成失败";
+
       return NextResponse.json({
         success: true,
         candidateProfile: mockCandidateProfile,
         fallback: true,
+        error: message,
       });
     }
   } catch {

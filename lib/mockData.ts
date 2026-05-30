@@ -89,7 +89,7 @@ export const mockInterviewRecords: InterviewRecord[] =
       stage: turn.stage,
       type: turn.type,
       content: turn.ai,
-      roundIndex: index + 1,
+      roundIndex: index,
       createdAt: new Date(Date.UTC(2026, 4, 30, 9, index * 2)).toISOString(),
     },
     {
@@ -97,7 +97,7 @@ export const mockInterviewRecords: InterviewRecord[] =
       stage: turn.stage,
       type: turn.type,
       content: turn.userMock,
-      roundIndex: index + 1,
+      roundIndex: index,
       createdAt: new Date(Date.UTC(2026, 4, 30, 9, index * 2 + 1)).toISOString(),
     },
   ]);

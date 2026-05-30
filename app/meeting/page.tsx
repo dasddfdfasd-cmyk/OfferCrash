@@ -34,6 +34,9 @@ import {
   writeJson,
   writeText,
 } from "@/components/offercrash-shared";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useRealtimeInterview } from "@/hooks/useRealtimeInterview";
 import { mockCandidateProfile, mockInterviewTurns, mockReport } from "@/lib/mockData";
 import type {
   CandidateProfile,
@@ -50,21 +53,85 @@ type ReportResponse = {
   error?: string;
 };
 
+type NextQuestionResponse = {
+  success?: boolean;
+  nextQuestion?: string;
+  stage?: string;
+  type?: string;
+  reason?: string;
+  shouldEnd?: boolean;
+  fallback?: boolean;
+  error?: string;
+};
+
+const CLOSING_QUESTION =
+  "好，本轮面试先到这里。我已经记录了你的表现，接下来系统会生成面试诊断报告。";
+
 function formatClock(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
   const seconds = (totalSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
 }
 
-function createRecord(role: "assistant" | "user", roundIndex: number): InterviewRecord {
-  const turn = mockInterviewTurns[roundIndex];
+function createAssistantRecord({
+  roundIndex,
+  stage,
+  type,
+  content,
+}: {
+  roundIndex: number;
+  stage: string;
+  type: string;
+  content: string;
+}): InterviewRecord {
   return {
-    role,
-    stage: turn.stage,
-    type: turn.type,
-    content: role === "assistant" ? turn.ai : turn.userMock,
-    roundIndex: roundIndex + 1,
+    role: "assistant",
+    stage,
+    type,
+    content,
+    roundIndex,
     createdAt: new Date().toISOString(),
+  };
+}
+
+function createUserRecord({
+  roundIndex,
+  stage,
+  type,
+  content,
+}: {
+  roundIndex: number;
+  stage: string;
+  type: string;
+  content: string;
+}): InterviewRecord {
+  return {
+    role: "user",
+    stage,
+    type,
+    content,
+    roundIndex,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function getMockFallbackQuestion(roundIndex: number) {
+  const nextTurn = mockInterviewTurns[roundIndex + 1];
+
+  if (!nextTurn) {
+    return {
+      nextQuestion: CLOSING_QUESTION,
+      stage: "收尾",
+      type: "closing",
+      shouldEnd: true,
+    };
+  }
+
+  return {
+    nextQuestion: nextTurn.ai,
+    stage: nextTurn.stage,
+    type: nextTurn.type,
+    shouldEnd: nextTurn.type === "closing",
   };
 }
 
@@ -77,13 +144,68 @@ export default function MeetingPage() {
   const [isMuted, setIsMuted] = useState(true);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [interviewMode, setInterviewMode] = useState<"text" | "realtime">("text");
   const [fallbackNotice, setFallbackNotice] = useState("");
+  const [userAnswerText, setUserAnswerText] = useState("");
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
+  const [answerNotice, setAnswerNotice] = useState("");
+  const [currentDynamicQuestion, setCurrentDynamicQuestion] = useState("");
+  const [currentDynamicStage, setCurrentDynamicStage] = useState("");
+  const [currentDynamicType, setCurrentDynamicType] = useState("");
   const generatingRef = useRef(false);
+  const lastSpokenQuestionRef = useRef("");
+  const speechSynthesis = useSpeechSynthesis();
+  const speechRecognition = useSpeechRecognition((transcript) => {
+    setUserAnswerText(transcript);
+    setAnswerNotice("");
+  });
+  const realtimeInterview = useRealtimeInterview({
+    onAssistantText: ({ content, stage, followUpType }) => {
+      if (!content.trim()) return;
+
+      const nextIndex = currentTurnIndex + 1;
+      const nextStage = stage || "实时追问";
+      const nextType = followUpType || "realtime";
+      const assistantRecord = createAssistantRecord({
+        roundIndex: nextIndex,
+        stage: nextStage,
+        type: nextType,
+        content,
+      });
+
+      setCurrentTurnIndex(nextIndex);
+      setCurrentDynamicQuestion(content);
+      setCurrentDynamicStage(nextStage);
+      setCurrentDynamicType(nextType);
+      setInterviewRecords((records) => [...records, assistantRecord]);
+      setMeetingStatus("ai_speaking");
+      window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
+    },
+    onUserTranscript: ({ content, isFinal }) => {
+      setUserAnswerText(content);
+      if (!isFinal || !content.trim()) return;
+
+      const userRecord = createUserRecord({
+        roundIndex: currentTurnIndex,
+        stage: visibleStage,
+        type: visibleType,
+        content,
+      });
+      setInterviewRecords((records) => [...records, userRecord]);
+    },
+    onFallback: (message) => {
+      setInterviewMode("text");
+      setFallbackNotice(message || "实时语音连接异常，已切换到文字面试模式。");
+    },
+  });
 
   const companyStyle = useMemo<CompanyStyle>(() => getCompanyStyle(), []);
   const selected = companyProfiles[companyStyle];
-  const currentTurn = mockInterviewTurns[currentTurnIndex];
+  const currentTurn = mockInterviewTurns[currentTurnIndex] ?? mockInterviewTurns.at(-1)!;
+  const visibleQuestion = currentDynamicQuestion || currentTurn.ai;
+  const visibleStage = currentDynamicStage || currentTurn.stage;
+  const visibleType = currentDynamicType || currentTurn.type;
 
   useEffect(() => {
     if (meetingStatus === "device_check" || meetingStatus === "ended") return undefined;
@@ -92,14 +214,26 @@ export default function MeetingPage() {
   }, [meetingStatus]);
 
   useEffect(() => {
-    if (!ttsEnabled || meetingStatus !== "ai_speaking") return;
-    if (!("speechSynthesis" in window)) return;
+    const shouldStop =
+      !ttsEnabled ||
+      meetingStatus === "device_check" ||
+      meetingStatus === "ai_thinking" ||
+      meetingStatus === "generating_report" ||
+      meetingStatus === "ended";
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(currentTurn.ai);
-    utterance.lang = "zh-CN";
-    window.speechSynthesis.speak(utterance);
-  }, [currentTurn.ai, meetingStatus, ttsEnabled]);
+    if (shouldStop) {
+      speechSynthesis.stop();
+      if (!ttsEnabled) {
+        lastSpokenQuestionRef.current = "";
+      }
+      return;
+    }
+
+    if (visibleQuestion && visibleQuestion !== lastSpokenQuestionRef.current) {
+      lastSpokenQuestionRef.current = visibleQuestion;
+      speechSynthesis.speak(visibleQuestion);
+    }
+  }, [meetingStatus, speechSynthesis, ttsEnabled, visibleQuestion]);
 
   const statusText: Record<MeetingStatus, string> = {
     device_check: "设备检查",
@@ -158,39 +292,180 @@ export default function MeetingPage() {
   );
 
   const enterMeeting = () => {
+    const firstTurn = mockInterviewTurns[0];
+    const firstRecord = createAssistantRecord({
+      roundIndex: 0,
+      stage: firstTurn.stage,
+      type: firstTurn.type,
+      content: firstTurn.ai,
+    });
+
     setCurrentTurnIndex(0);
-    const firstRecord = createRecord("assistant", 0);
+    setCurrentDynamicQuestion(firstTurn.ai);
+    setCurrentDynamicStage(firstTurn.stage);
+    setCurrentDynamicType(firstTurn.type);
+    setUserAnswerText("");
+    setAnswerNotice("");
+    setFallbackNotice("");
     setInterviewRecords([firstRecord]);
     setMeetingStatus("ai_speaking");
     window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
   };
 
-  const finishAnswer = () => {
-    if (meetingStatus !== "user_answering") return;
-    const userRecord = createRecord("user", currentTurnIndex);
-    const nextRecords = [...interviewRecords, userRecord];
-    setInterviewRecords(nextRecords);
+  const appendClosingAndGenerate = useCallback(
+    (records: InterviewRecord[], roundIndex: number) => {
+      const closingRecord = createAssistantRecord({
+        roundIndex,
+        stage: "收尾",
+        type: "closing",
+        content: CLOSING_QUESTION,
+      });
+      const finalRecords = [...records, closingRecord];
+
+      setCurrentDynamicQuestion(CLOSING_QUESTION);
+      setCurrentDynamicStage("收尾");
+      setCurrentDynamicType("closing");
+      setInterviewRecords(finalRecords);
+      setMeetingStatus("generating_report");
+      generateReport(finalRecords);
+    },
+    [generateReport],
+  );
+
+  const submitAnswer = async () => {
+    if (meetingStatus !== "user_answering" || isSubmittingAnswer) return;
+
+    const trimmedAnswer = userAnswerText.trim();
+    if (!trimmedAnswer) {
+      setAnswerNotice("请先输入回答内容。");
+      return;
+    }
+
+    setIsSubmittingAnswer(true);
+    setAnswerNotice("");
+    setFallbackNotice("");
+    speechRecognition.stop();
+
+    const userRecord = createUserRecord({
+      roundIndex: currentTurnIndex,
+      stage: visibleStage,
+      type: visibleType,
+      content: trimmedAnswer,
+    });
+    const recordsWithUserAnswer = [...interviewRecords, userRecord];
+
+    setInterviewRecords(recordsWithUserAnswer);
+    setUserAnswerText("");
     setMeetingStatus("ai_thinking");
 
-    window.setTimeout(() => {
+    if (currentTurnIndex >= 7) {
+      setIsSubmittingAnswer(false);
+      appendClosingAndGenerate(recordsWithUserAnswer, currentTurnIndex + 1);
+      return;
+    }
+
+    try {
+      const candidateProfile = getCandidateProfile() ?? mockCandidateProfile;
+      const response = await fetch("/api/interview/next-question", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateProfile,
+          companyStyle,
+          interviewRecords: recordsWithUserAnswer,
+          currentStage: visibleStage,
+          roundIndex: currentTurnIndex,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as NextQuestionResponse;
+
+      if (!response.ok || data.success !== true || !data.nextQuestion) {
+        throw new Error(data.error || "next question failed");
+      }
+
       const nextIndex = currentTurnIndex + 1;
-      if (nextIndex >= mockInterviewTurns.length) {
-        generateReport(nextRecords);
+      const nextStage = data.stage || "追问";
+      const nextType = data.type || "followup";
+      const assistantRecord = createAssistantRecord({
+        roundIndex: nextIndex,
+        stage: nextStage,
+        type: nextType,
+        content: data.nextQuestion,
+      });
+      const recordsWithAssistant = [...recordsWithUserAnswer, assistantRecord];
+
+      setCurrentTurnIndex(nextIndex);
+      setCurrentDynamicQuestion(data.nextQuestion);
+      setCurrentDynamicStage(nextStage);
+      setCurrentDynamicType(nextType);
+      setInterviewRecords(recordsWithAssistant);
+
+      if (data.shouldEnd) {
+        setIsSubmittingAnswer(false);
+        setMeetingStatus("generating_report");
+        generateReport(recordsWithAssistant);
         return;
       }
 
-      const assistantRecord = createRecord("assistant", nextIndex);
-      const recordsWithNext = [...nextRecords, assistantRecord];
-      setCurrentTurnIndex(nextIndex);
-      setInterviewRecords(recordsWithNext);
       setMeetingStatus("ai_speaking");
+      setIsSubmittingAnswer(false);
+      window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
+    } catch (error) {
+      console.error(error);
+      const fallback = getMockFallbackQuestion(currentTurnIndex);
+      const nextIndex = currentTurnIndex + 1;
+      const assistantRecord = createAssistantRecord({
+        roundIndex: nextIndex,
+        stage: fallback.stage,
+        type: fallback.type,
+        content: fallback.nextQuestion,
+      });
+      const recordsWithFallback = [...recordsWithUserAnswer, assistantRecord];
 
-      if (nextIndex === mockInterviewTurns.length - 1) {
-        window.setTimeout(() => generateReport(recordsWithNext), 1400);
-      } else {
-        window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
+      setFallbackNotice("动态追问服务异常，已切换到演示追问。");
+      setCurrentTurnIndex(nextIndex);
+      setCurrentDynamicQuestion(fallback.nextQuestion);
+      setCurrentDynamicStage(fallback.stage);
+      setCurrentDynamicType(fallback.type);
+      setInterviewRecords(recordsWithFallback);
+      setIsSubmittingAnswer(false);
+
+      if (fallback.shouldEnd) {
+        setMeetingStatus("generating_report");
+        generateReport(recordsWithFallback);
+        return;
       }
-    }, 1000);
+
+      setMeetingStatus("ai_speaking");
+      window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
+    }
+  };
+
+  const fillExampleAnswer = () => {
+    setUserAnswerText(currentTurn.userMock);
+    setAnswerNotice("");
+  };
+
+  const startVoiceAnswer = () => {
+    setAnswerNotice("");
+    speechRecognition.start();
+  };
+
+  const startRealtimeMode = () => {
+    setFallbackNotice("");
+    setInterviewMode("realtime");
+    realtimeInterview.startRealtime({
+      sessionId: crypto.randomUUID(),
+      companyStyle,
+      candidateProfile: getCandidateProfile() ?? mockCandidateProfile,
+      interviewRecords,
+    });
+  };
+
+  const stopRealtimeMode = () => {
+    realtimeInterview.stopRealtime();
+    setInterviewMode("text");
+    setFallbackNotice("已切换到文字面试模式。");
   };
 
   const questionText =
@@ -198,7 +473,7 @@ export default function MeetingPage() {
       ? "AI 正在分析你的回答..."
       : meetingStatus === "generating_report"
         ? "正在生成面试诊断报告..."
-        : currentTurn.ai;
+        : visibleQuestion;
 
   return (
     <main className="oc-meeting">
@@ -231,7 +506,38 @@ export default function MeetingPage() {
                 <MessageSquare size={15} />
               </span>
               <strong>当前问题</strong>
-              <span className="oc-tag">{currentTurn.type}</span>
+              <span className="oc-tag">{visibleType}</span>
+            </div>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                border: "1px solid #dbeafe",
+                borderRadius: 999,
+                background: "#eff6ff",
+                padding: 4,
+                width: "fit-content",
+              }}
+            >
+              <button
+                className={interviewMode === "text" ? "oc-primary" : "oc-secondary"}
+                onClick={stopRealtimeMode}
+                style={{ minHeight: 32, padding: "0 12px", boxShadow: "none" }}
+              >
+                文字面试模式
+              </button>
+              <button
+                className={interviewMode === "realtime" ? "oc-primary" : "oc-secondary"}
+                disabled={realtimeInterview.isConnecting}
+                onClick={startRealtimeMode}
+                style={{ minHeight: 32, padding: "0 12px", boxShadow: "none" }}
+              >
+                {realtimeInterview.isConnecting ? "连接中" : "实时语音模式"}
+              </button>
+              <span className="oc-muted" style={{ fontSize: 12, padding: "0 8px" }}>
+                {realtimeInterview.statusText}
+              </span>
             </div>
             <p style={{ color: "#111827", lineHeight: 1.8, fontWeight: 700 }}>
               {questionText}
@@ -274,8 +580,7 @@ export default function MeetingPage() {
               boxShadow: "0 8px 20px rgba(17,24,39,.06)",
             }}
           >
-            {statusText[meetingStatus]} · 第 {currentTurnIndex + 1}/
-            {mockInterviewTurns.length} 轮
+            {statusText[meetingStatus]} · 第 {currentTurnIndex + 1}/8 轮
           </div>
           {fallbackNotice && (
             <div
@@ -334,7 +639,9 @@ export default function MeetingPage() {
                   <strong style={{ color: record.role === "user" ? "#059669" : "#2563eb" }}>
                     {record.role === "user" ? "你" : "AI"}
                   </strong>
-                  <span className="oc-tag">{record.stage}</span>
+                  <span className="oc-tag">
+                    {record.stage} · {record.type}
+                  </span>
                 </div>
                 <p style={{ lineHeight: 1.8 }}>{record.content}</p>
               </article>
@@ -343,22 +650,98 @@ export default function MeetingPage() {
           <div style={{ borderTop: "1px solid #e5e7eb", padding: 14 }}>
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
+                display: "grid",
+                gap: 10,
                 border: "1px solid #e5e7eb",
-                borderRadius: 10,
+                borderRadius: 12,
                 background: "#f9fafb",
-                padding: "8px 10px",
+                padding: 12,
               }}
             >
-              <input
-                disabled
-                placeholder="请输入消息..."
-                style={{ flex: 1, border: 0, background: "transparent", outline: "none" }}
+              <textarea
+                value={userAnswerText}
+                disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+                placeholder="请输入你的回答，或使用示例回答快速体验。"
+                onChange={(event) => {
+                  setUserAnswerText(event.target.value);
+                  if (answerNotice) setAnswerNotice("");
+                }}
+                style={{
+                  minHeight: 92,
+                  resize: "vertical",
+                  border: "1px solid #dde7f8",
+                  borderRadius: 10,
+                  background: "#fff",
+                  color: "#111827",
+                  outline: "none",
+                  padding: "10px 12px",
+                  lineHeight: 1.6,
+                }}
               />
-              <Send size={17} color="#6b7280" />
+              <div style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
+                <button
+                  className="oc-secondary"
+                  disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+                  onClick={fillExampleAnswer}
+                  style={{ minHeight: 38, padding: "0 12px" }}
+                >
+                  使用示例回答
+                </button>
+                <button
+                  className="oc-primary"
+                  disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+                  onClick={submitAnswer}
+                  style={{ minHeight: 38, padding: "0 12px" }}
+                >
+                  <Send size={16} />
+                  提交回答
+                </button>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
+                <button
+                  className="oc-secondary"
+                  disabled={
+                    meetingStatus !== "user_answering" ||
+                    isSubmittingAnswer ||
+                    speechRecognition.isListening
+                  }
+                  onClick={startVoiceAnswer}
+                  style={{ minHeight: 36, padding: "0 12px" }}
+                >
+                  <Mic size={15} />
+                  开始语音回答
+                </button>
+                <button
+                  className="oc-secondary"
+                  disabled={!speechRecognition.isListening}
+                  onClick={speechRecognition.stop}
+                  style={{ minHeight: 36, padding: "0 12px" }}
+                >
+                  <MicOff size={15} />
+                  停止识别
+                </button>
+              </div>
             </div>
+            {answerNotice && (
+              <p style={{ color: "#b91c1c", fontSize: 12, fontWeight: 700, margin: "8px 0 0" }}>
+                {answerNotice}
+              </p>
+            )}
+            {!speechRecognition.isSupported && (
+              <p style={{ color: "#b45309", fontSize: 12, fontWeight: 700, margin: "8px 0 0" }}>
+                当前浏览器不支持语音识别，请使用文字输入回答。
+              </p>
+            )}
+            {speechRecognition.error && (
+              <p style={{ color: "#b91c1c", fontSize: 12, fontWeight: 700, margin: "8px 0 0" }}>
+                {speechRecognition.error}
+              </p>
+            )}
+            {speechRecognition.isListening && (
+              <p style={{ color: "#2563eb", fontSize: 12, fontWeight: 700, margin: "8px 0 0" }}>
+                正在识别语音，识别结果会实时写入回答框。
+              </p>
+            )}
             <p className="oc-muted" style={{ fontSize: 12 }}>
               实时记录将用于面试评估，请如实作答。
             </p>
@@ -381,16 +764,16 @@ export default function MeetingPage() {
           />
           <ControlButton
             icon={<Volume2 size={22} />}
-            label={ttsEnabled ? "语音播报开" : "语音播报关"}
+            label={ttsEnabled ? "AI 语音播报：开" : "AI 语音播报：关"}
             onClick={() => setTtsEnabled((value) => !value)}
           />
         </div>
         <button
           className="oc-primary"
-          disabled={meetingStatus !== "user_answering"}
-          onClick={finishAnswer}
+          disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+          onClick={submitAnswer}
           style={
-            meetingStatus !== "user_answering"
+            meetingStatus !== "user_answering" || isSubmittingAnswer
               ? {
                   borderColor: "#f3f4f6",
                   background: "#f3f4f6",
@@ -400,7 +783,7 @@ export default function MeetingPage() {
               : undefined
           }
         >
-          回答完毕
+          提交回答
         </button>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button className="oc-control oc-end" onClick={() => setShowEndConfirm(true)}>

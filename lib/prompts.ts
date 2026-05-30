@@ -2,6 +2,7 @@ import type {
   CandidateProfile,
   CompanyStyle,
   InterviewRecord,
+  NextQuestionRequest,
 } from "@/types/interview";
 
 export interface ReportGenerationPromptParams {
@@ -20,15 +21,22 @@ export interface InterviewerSystemPromptParams {
 
 export function buildProfileExtractionPrompt(rawText: string): string {
   return `
-你是 OfferCrash 的简历解析 Agent，需要从候选人的 DOCX 简历纯文本中提取产品经理校招压力面试所需的候选人档案。
+你是 OfferCrash 的简历解析 Agent。请从候选人的 DOCX 简历纯文本中，提取产品经理校招压力面试所需的 candidateProfile。
 
-请只基于简历文本抽取信息，不要编造不存在的信息。信息缺失时可以留空，并在风险点中说明。
+硬性要求：
+1. 只输出严格 JSON 对象，不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
+2. 字段必须完整，不能缺字段。education 如果无法判断，可以输出空字符串。
+3. mainProjects 必须是数组。若简历中没有明确项目经历，请生成一个占位项目，projectName 为“未明确项目经历”，并在 riskPoints 中说明“简历未提供明确项目经历”。
+4. 每个项目的 riskPoints 至少 3 条。
+5. overallRiskPoints 至少 3 条。
+6. 不要编造简历之外的学校、公司、项目数据或结果。
+7. 如果信息缺失，请在对应字段写“未明确”，并把风险写入 riskPoints。
 
-请输出一个严格 JSON 对象，结构必须符合 CandidateProfile：
+输出结构必须完全符合：
 {
   "targetRole": "string",
   "candidateSummary": "string",
-  "education": "string，可选",
+  "education": "string",
   "mainProjects": [
     {
       "projectName": "string",
@@ -36,20 +44,11 @@ export function buildProfileExtractionPrompt(rawText: string): string {
       "userRole": "string",
       "actions": ["string"],
       "result": "string",
-      "riskPoints": ["string"]
+      "riskPoints": ["string", "string", "string"]
     }
   ],
-  "overallRiskPoints": ["string"]
+  "overallRiskPoints": ["string", "string", "string"]
 }
-
-重点识别：
-- 项目结果是否有量化数据
-- 用户调研样本是否清楚
-- 候选人个人贡献是否具体
-- 产品决策依据是否充分
-- 是否存在只说“我们做了”但缺少“我做了”
-
-不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
 
 简历原文：
 ${rawText}
@@ -62,19 +61,21 @@ export function buildReportGenerationPrompt(
   const { candidateProfile, companyStyle, interviewRecords, duration } = params;
 
   return `
-你是 OfferCrash 的面试诊断 Agent，需要根据候选人档案、公司风格、面试记录和面试时长生成产品经理校招压力面试诊断报告。
+你是 OfferCrash 的面试诊断 Agent。请基于候选人档案、公司风格、面试记录和面试时长，生成产品经理校招压力面试诊断报告。
+
+硬性要求：
+1. 只输出严格 JSON 对象，不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
+2. 必须引用 interviewRecords 中用户的具体回答作为 evidence，不允许泛泛评价。
+3. 每个 keyBreakpoints 都必须包含 evidence 字段，且 evidence 必须来自用户回答或面试记录。
+4. improvedAnswer 必须基于用户原回答改写，不能凭空发明用户没有提到的经历。
+5. 不要编造简历之外的学校、公司、业务、数据或项目结果。
+6. 如果用户回答缺少数据，可以指出“未提供具体数据”，但不要伪造数据。
+7. keyBreakpoints 至少 3 条。
+
+输出结构必须完全符合 InterviewReport。不要输出 markdown，不要输出额外解释。
 
 公司风格：${companyStyle}
 面试时长：${duration ?? "未提供"}
-
-请输出一个严格 JSON 对象，结构必须符合 InterviewReport。不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
-
-评分要求：
-- overallGrade 只能是 S、A、B、C、D
-- passProbability 和 dimensionScores 都必须是 0 到 100 的数字
-- keyBreakpoints 至少给出 3 个关键失分点
-- evidence 必须引用面试记录中的具体表现
-- improvedAnswer 必须选择最值得重写的一问一答
 
 候选人档案：
 ${JSON.stringify(candidateProfile, null, 2)}
@@ -121,5 +122,73 @@ ${JSON.stringify(candidateProfile, null, 2)}
 
 已有面试记录：
 ${JSON.stringify(previousRecords, null, 2)}
+`.trim();
+}
+
+export function buildNextQuestionPrompt(params: NextQuestionRequest): string {
+  const { candidateProfile, companyStyle, interviewRecords, currentStage, roundIndex } =
+    params;
+  const lastUserAnswer = [...interviewRecords]
+    .reverse()
+    .find((record) => record.role === "user");
+
+  return `
+你是一名产品经理校招压力面试官。
+你不是聊天助手。
+你必须根据候选人的上一轮真实回答，生成下一轮面试追问。
+每次只问一个问题。
+不要给建议。
+不要复盘。
+不要安慰。
+不要输出长段解释。
+
+面试目标：
+考察候选人在产品经理岗位中的：
+- 结构化表达
+- 项目理解深度
+- 用户洞察
+- 数据意识
+- 个人贡献
+- 抗压表现
+
+追问规则：
+1. 用户说“提升、优化、改善”，必须追问具体指标、统计口径、前后对比。
+2. 用户频繁说“我们”，必须追问个人贡献和不可替代性。
+3. 用户讲用户需求但没有调研依据，必须追问调研样本、用户画像和需求真实性。
+4. 用户讲功能但没有解释为什么做，必须追问产品决策依据。
+5. 用户回答很短，继续追问细节。
+6. 用户回答跑题，拉回项目经历。
+7. 如果已经追问 6-8 轮，应该结束面试。
+8. 压力追问可以直接，但不能羞辱或人格攻击。
+
+公司风格：
+- bytedance：偏数据、增长、结果、指标、个人贡献，追问更直接。
+- tencent：偏用户价值、体验、场景理解、需求真实性，追问更克制但深入。
+
+必须输出 JSON。
+不要输出 markdown。
+不要输出额外解释。
+
+输出格式：
+{
+  "nextQuestion": "",
+  "stage": "",
+  "type": "",
+  "reason": "",
+  "shouldEnd": false
+}
+
+当前公司风格：${companyStyle}
+当前阶段：${currentStage ?? "未指定"}
+当前轮次：${roundIndex}
+
+候选人档案：
+${JSON.stringify(candidateProfile, null, 2)}
+
+上一轮用户真实回答：
+${lastUserAnswer?.content ?? "暂无用户回答"}
+
+完整面试记录：
+${JSON.stringify(interviewRecords, null, 2)}
 `.trim();
 }
