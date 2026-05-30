@@ -29,6 +29,13 @@ const scoreLabels: Record<keyof InterviewReport["dimensionScores"], string> = {
   pressureResistance: "抗压表现",
 };
 
+function safeReport(source: InterviewReport): InterviewReport {
+  if (source?.dimensionScores && source?.keyBreakpoints && source?.improvedAnswer && source?.nextTrainingPlan) {
+    return source;
+  }
+  return mockReport;
+}
+
 export default function ReportPage() {
   const [report, setReport] = useState<InterviewReport>(mockReport);
   const [showFallbackNotice, setShowFallbackNotice] = useState(false);
@@ -36,7 +43,7 @@ export default function ReportPage() {
   const selected = companyProfiles[companyStyle];
 
   useEffect(() => {
-    setReport(getReport());
+    setReport(safeReport(getReport()));
     setShowFallbackNotice(readText(STORAGE_KEYS.reportFallback, "false") === "true");
     setCompanyStyle(getCompanyStyle());
   }, []);

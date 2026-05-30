@@ -298,9 +298,11 @@ export function HomePage() {
         <section className="oc-grid-hero">
           <div>
             <Tag>产品经理大厂校招压力面试 Agent</Tag>
-            <h1 className="oc-h1">提前崩一次，正式面试少崩一次。</h1>
+            <h1 className="oc-h1" style={{ letterSpacing: "0.04em" }}>
+              专为大厂校招打造的AI Agent 面试官
+            </h1>
             <p className="oc-lead">
-              上传 DOCX 简历，进入一场由 AI 面试官主动主持的产品经理校招压力面试。支持字节、腾讯风格，动态追问，面试后生成诊断报告。
+              从简历解析、语音面试、动态追问到诊断报告，OfferCrash 帮助产品经理候选人在正式面试前完成一次真实的高压预演。
             </p>
             <div className="oc-actions">
               <PrimaryButton href="/upload" icon={<Play size={18} />}>

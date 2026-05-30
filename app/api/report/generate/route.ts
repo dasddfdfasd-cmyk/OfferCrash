@@ -13,6 +13,23 @@ import type {
 
 export const runtime = "nodejs";
 
+function isValidReport(report: unknown): report is InterviewReport {
+  if (!report || typeof report !== "object") return false;
+  const r = report as Record<string, unknown>;
+  return (
+    typeof r.overallGrade === "string" &&
+    typeof r.passProbability === "number" &&
+    typeof r.oneSentenceFeedback === "string" &&
+    r.dimensionScores != null &&
+    typeof r.dimensionScores === "object" &&
+    Array.isArray(r.keyBreakpoints) &&
+    r.improvedAnswer != null &&
+    typeof r.improvedAnswer === "object" &&
+    r.nextTrainingPlan != null &&
+    typeof r.nextTrainingPlan === "object"
+  );
+}
+
 interface GenerateReportRequest {
   candidateProfile?: CandidateProfile;
   companyStyle?: CompanyStyle;
@@ -50,12 +67,12 @@ export async function POST(request: Request) {
       const modelText = await callTextModel(prompt);
       const report = safeParseJson<InterviewReport>(modelText, mockReport);
 
-      if (report === mockReport) {
+      if (!isValidReport(report)) {
         return NextResponse.json({
           success: true,
           report: mockReport,
           fallback: true,
-          error: "模型返回内容不是可解析的 InterviewReport JSON",
+          error: "模型返回内容缺少必要字段，已使用演示报告",
         });
       }
 
