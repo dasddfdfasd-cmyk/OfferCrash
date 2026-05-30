@@ -56,13 +56,13 @@ function formatClock(totalSeconds: number) {
   return `${minutes}:${seconds}`;
 }
 
-function createRecord(role: "assistant" | "user", roundIndex: number): InterviewRecord {
+function createAssistantRecord(roundIndex: number): InterviewRecord {
   const turn = mockInterviewTurns[roundIndex];
   return {
-    role,
+    role: "assistant",
     stage: turn.stage,
     type: turn.type,
-    content: role === "assistant" ? turn.ai : turn.userMock,
+    content: turn.ai,
     roundIndex: roundIndex + 1,
     createdAt: new Date().toISOString(),
   };
@@ -79,6 +79,9 @@ export default function MeetingPage() {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [fallbackNotice, setFallbackNotice] = useState("");
+  const [userAnswerText, setUserAnswerText] = useState("");
+  const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
+  const [answerNotice, setAnswerNotice] = useState("");
   const generatingRef = useRef(false);
 
   const companyStyle = useMemo<CompanyStyle>(() => getCompanyStyle(), []);
@@ -158,38 +161,68 @@ export default function MeetingPage() {
 
   const enterMeeting = () => {
     setCurrentTurnIndex(0);
-    const firstRecord = createRecord("assistant", 0);
+    setUserAnswerText("");
+    setAnswerNotice("");
+    setIsSubmittingAnswer(false);
+    const firstRecord = createAssistantRecord(0);
     setInterviewRecords([firstRecord]);
     setMeetingStatus("ai_speaking");
     window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
   };
 
-  const finishAnswer = () => {
-    if (meetingStatus !== "user_answering") return;
-    const userRecord = createRecord("user", currentTurnIndex);
+  const submitAnswer = () => {
+    if (meetingStatus !== "user_answering" || isSubmittingAnswer) return;
+    const answer = userAnswerText.trim();
+    if (!answer) {
+      setAnswerNotice("请先输入回答内容");
+      return;
+    }
+
+    setIsSubmittingAnswer(true);
+    setAnswerNotice("");
+    const userRecord: InterviewRecord = {
+      role: "user",
+      stage: currentTurn.stage,
+      type: currentTurn.type,
+      content: answer,
+      roundIndex: currentTurnIndex,
+      createdAt: new Date().toISOString(),
+    };
     const nextRecords = [...interviewRecords, userRecord];
     setInterviewRecords(nextRecords);
+    setUserAnswerText("");
     setMeetingStatus("ai_thinking");
 
     window.setTimeout(() => {
       const nextIndex = currentTurnIndex + 1;
       if (nextIndex >= mockInterviewTurns.length) {
+        setIsSubmittingAnswer(false);
         generateReport(nextRecords);
         return;
       }
 
-      const assistantRecord = createRecord("assistant", nextIndex);
+      const assistantRecord = createAssistantRecord(nextIndex);
       const recordsWithNext = [...nextRecords, assistantRecord];
       setCurrentTurnIndex(nextIndex);
       setInterviewRecords(recordsWithNext);
       setMeetingStatus("ai_speaking");
 
       if (nextIndex === mockInterviewTurns.length - 1) {
+        setIsSubmittingAnswer(false);
         window.setTimeout(() => generateReport(recordsWithNext), 1400);
       } else {
-        window.setTimeout(() => setMeetingStatus("user_answering"), 1000);
+        window.setTimeout(() => {
+          setIsSubmittingAnswer(false);
+          setMeetingStatus("user_answering");
+        }, 1000);
       }
     }, 1000);
+  };
+
+  const useSampleAnswer = () => {
+    if (meetingStatus !== "user_answering" || isSubmittingAnswer) return;
+    setUserAnswerText(currentTurn.userMock);
+    setAnswerNotice("");
   };
 
   const questionText =
@@ -285,12 +318,67 @@ export default function MeetingPage() {
               </article>
             ))}
           </div>
-          <div style={{ borderTop: "1px solid #e5e7eb", padding: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #e5e7eb", borderRadius: 10, background: "#f9fafb", padding: "8px 10px" }}>
-              <input disabled placeholder="请输入消息..." style={{ flex: 1, border: 0, background: "transparent", outline: "none" }} />
-              <Send size={17} color="#6b7280" />
+          <div style={{ borderTop: "1px solid #e5e7eb", padding: 14, background: "#fff" }}>
+            <textarea
+              disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+              onChange={(event) => {
+                setUserAnswerText(event.target.value);
+                if (answerNotice) setAnswerNotice("");
+              }}
+              placeholder="请输入你的回答，或稍后使用语音转文字后提交。"
+              rows={4}
+              value={userAnswerText}
+              style={{
+                width: "100%",
+                resize: "none",
+                border: `1px solid ${answerNotice ? "#fca5a5" : "#dde7f8"}`,
+                borderRadius: 10,
+                background: meetingStatus === "user_answering" ? "#f9fafb" : "#f3f4f6",
+                outline: "none",
+                padding: "10px 12px",
+                color: "#111827",
+                lineHeight: 1.6,
+              }}
+            />
+            {answerNotice && (
+              <p style={{ marginTop: 6, color: "#ef4444", fontSize: 12, fontWeight: 700 }}>
+                {answerNotice}
+              </p>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+              <button
+                className="oc-primary"
+                disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+                onClick={submitAnswer}
+                style={{
+                  minHeight: 38,
+                  padding: "0 14px",
+                  fontSize: 13,
+                  ...(meetingStatus !== "user_answering" || isSubmittingAnswer
+                    ? { borderColor: "#f3f4f6", background: "#f3f4f6", color: "#6b7280", boxShadow: "none" }
+                    : undefined),
+                }}
+              >
+                提交回答
+                <Send size={16} />
+              </button>
+              <button
+                className="oc-secondary"
+                disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+                onClick={useSampleAnswer}
+                style={{
+                  minHeight: 38,
+                  padding: "0 12px",
+                  fontSize: 13,
+                  ...(meetingStatus !== "user_answering" || isSubmittingAnswer
+                    ? { background: "#f9fafb", color: "#9ca3af" }
+                    : undefined),
+                }}
+              >
+                使用示例回答
+              </button>
             </div>
-            <p className="oc-muted" style={{ fontSize: 12 }}>实时记录将用于面试评估，请如实作答。</p>
+            <p className="oc-muted" style={{ fontSize: 12, marginTop: 8 }}>实时记录将用于面试评估，请如实作答。</p>
           </div>
         </aside>
       </div>
@@ -316,11 +404,11 @@ export default function MeetingPage() {
         </div>
         <button
           className="oc-primary"
-          disabled={meetingStatus !== "user_answering"}
-          onClick={finishAnswer}
-          style={meetingStatus !== "user_answering" ? { borderColor: "#f3f4f6", background: "#f3f4f6", color: "#6b7280", boxShadow: "none" } : undefined}
+          disabled={meetingStatus !== "user_answering" || isSubmittingAnswer}
+          onClick={submitAnswer}
+          style={meetingStatus !== "user_answering" || isSubmittingAnswer ? { borderColor: "#f3f4f6", background: "#f3f4f6", color: "#6b7280", boxShadow: "none" } : undefined}
         >
-          回答完毕
+          提交回答
         </button>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button className="oc-control oc-end" onClick={() => setShowEndConfirm(true)}>
