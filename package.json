@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "start": "next start",
     "dev:realtime": "tsx server/realtime-gateway.ts",
     "preview": "next start"
   },

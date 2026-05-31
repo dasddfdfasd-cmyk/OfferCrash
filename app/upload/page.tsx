@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, DragEvent } from "react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
@@ -24,6 +24,8 @@ import {
 } from "@/components/offercrash-shared";
 import { mockCandidateProfile } from "@/lib/mockData";
 import type { CandidateProfile } from "@/types/interview";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 const loadingLines = [
   "正在读取 DOCX...",
@@ -63,11 +65,11 @@ export default function UploadPage() {
   };
 
   const chooseFile = () => {
-    if (!isUploading) fileInputRef.current?.click();
+    if (isUploading) return;
+    fileInputRef.current?.click();
   };
 
-  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
+  const setFile = (file: File | null) => {
     setError("");
     setNotice("");
 
@@ -78,19 +80,35 @@ export default function UploadPage() {
 
     if (!file.name.toLowerCase().endsWith(".docx")) {
       setSelectedFile(null);
-      event.target.value = "";
       setError("仅支持上传 .docx 文件，请重新选择。");
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setSelectedFile(null);
+      setError("文件超过 5MB，请压缩或更换简历文件。");
       return;
     }
 
     setSelectedFile(file);
   };
 
+  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  };
+
+  const onDrop = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (isUploading) return;
+    setFile(event.dataTransfer.files?.[0] ?? null);
+  };
+
   const upload = async () => {
     setError("");
     setNotice("");
 
-    if (!selectedFile) {
+    if (!selectedFile && !isDemoMode()) {
       setError("请先选择一个 .docx 简历文件。");
       return;
     }
@@ -103,7 +121,7 @@ export default function UploadPage() {
 
       if (!isDemoMode()) {
         const formData = new FormData();
-        formData.append("file", selectedFile);
+        formData.append("file", selectedFile!);
 
         const uploadResponse = await fetch("/api/upload-docx", {
           method: "POST",
@@ -137,7 +155,7 @@ export default function UploadPage() {
       router.push("/profile");
     } catch (uploadError) {
       console.error(uploadError);
-      setError(DEMO_NOTICE);
+      setError(uploadError instanceof Error ? uploadError.message : DEMO_NOTICE);
       setNotice("你仍然可以点击“使用示例简历体验”继续完整流程。");
     } finally {
       stopLoading();
@@ -164,10 +182,17 @@ export default function UploadPage() {
             ref={fileInputRef}
             className="oc-hidden"
             type="file"
-            accept=".docx"
+            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={onFileChange}
           />
-          <button className="oc-upload-drop" disabled={isUploading} onClick={chooseFile}>
+          <button
+            className="oc-upload-drop"
+            disabled={isUploading}
+            type="button"
+            onClick={chooseFile}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={onDrop}
+          >
             <span
               className="oc-logo"
               style={{ width: 64, height: 64, background: "#fff", color: "#2563eb" }}
@@ -176,7 +201,7 @@ export default function UploadPage() {
             </span>
             <h2 style={{ marginTop: 22 }}>拖拽 DOCX 到这里，或点击选择文件</h2>
             <p className="oc-muted">
-              {selectedFile ? `已选择：${selectedFile.name}` : "仅支持 .docx 文件"}
+              {selectedFile ? `已选择：${selectedFile.name}` : "仅支持 .docx 文件，最大 5MB"}
             </p>
           </button>
 
@@ -198,7 +223,7 @@ export default function UploadPage() {
             <Card className="oc-modal" style={{ textAlign: "center" }}>
               <RefreshCw className="spin" color="#2563eb" size={34} />
               <h2 style={{ color: "#111827" }}>{loadingLine}</h2>
-              <p className="oc-muted">解析失败时会自动提示使用示例简历继续体验。</p>
+              <p className="oc-muted">解析失败时会提示你使用示例简历继续体验。</p>
             </Card>
           </div>
         )}

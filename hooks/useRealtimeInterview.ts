@@ -118,8 +118,11 @@ export function useRealtimeInterview({
 
   const startRealtime = useCallback(
     async (payload: RealtimeStartPayload) => {
-      const gatewayUrl =
-        process.env.NEXT_PUBLIC_REALTIME_GATEWAY_URL || "ws://localhost:8787/ws/interview";
+      const gatewayUrl = process.env.NEXT_PUBLIC_REALTIME_GATEWAY_URL?.trim();
+      if (!gatewayUrl) {
+        fallbackToTextMode("实时语音网关未配置，已切换到文字面试模式。");
+        return;
+      }
 
       try {
         setIsConnecting(true);

@@ -132,8 +132,8 @@ a {
 
 .oc-grid-hero {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 34px;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
   align-items: center;
 }
 
@@ -151,6 +151,18 @@ a {
   color: #374151;
   font-size: 18px;
   line-height: 1.8;
+}
+
+@keyframes oc-pulse {
+  from {
+    transform: scale(0.92);
+    opacity: 0.42;
+  }
+
+  to {
+    transform: scale(1.35);
+    opacity: 0;
+  }
 }
 
 .oc-actions {

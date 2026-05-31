@@ -8,6 +8,17 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    const contentType = request.headers.get("content-type") ?? "";
+    if (
+      !contentType.includes("multipart/form-data") &&
+      !contentType.includes("application/x-www-form-urlencoded")
+    ) {
+      return NextResponse.json(
+        { success: false, error: "请求格式错误，请使用 multipart/form-data 上传文件" },
+        { status: 400 },
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -41,13 +52,10 @@ export async function POST(request: Request) {
       fileName: file.name,
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message === "解析文本为空"
-        ? error.message
-        : "DOCX 解析失败";
+    const reason = error instanceof Error && error.message ? error.message : "未知错误";
 
     return NextResponse.json(
-      { success: false, error: message },
+      { success: false, error: `DOCX 解析失败：${reason}` },
       { status: 500 },
     );
   }

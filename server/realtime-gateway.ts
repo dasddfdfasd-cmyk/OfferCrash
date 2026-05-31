@@ -121,7 +121,7 @@ wss.on("connection", (client) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`OfferCrash realtime gateway listening on ws://localhost:${PORT}${PATH}`);
+  console.log(`OfferCrash realtime gateway listening on port ${PORT}${PATH}`);
 });
 
 function parseClientMessage(text: string): ClientMessage | null {

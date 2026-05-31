@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -299,7 +299,7 @@ export function HomePage() {
           <div>
             <Tag>产品经理大厂校招压力面试 Agent</Tag>
             <h1 className="oc-h1" style={{ letterSpacing: "0.04em" }}>
-              专为大厂校招打造的AI Agent 面试官
+              专为大厂校招打造的 Agent 面试官
             </h1>
             <p className="oc-lead">
               从简历解析、语音面试、动态追问到诊断报告，OfferCrash 帮助产品经理候选人在正式面试前完成一次真实的高压预演。
@@ -317,9 +317,7 @@ export function HomePage() {
               </span>
             </div>
           </div>
-          <Card style={{ padding: 20 }}>
-            <MeetingPreview />
-          </Card>
+          <HeroShowcase />
         </section>
         <section className="oc-feature-grid">
           {features.map(([title, desc, icon]) => (
@@ -334,6 +332,283 @@ export function HomePage() {
         </section>
       </PageShell>
     </AppFrame>
+  );
+}
+
+function HeroShowcase() {
+  return (
+    <div style={{ position: "relative", minHeight: 500, padding: "20px 0 18px" }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: "18px 0 0 18px",
+          borderRadius: 36,
+          background:
+            "radial-gradient(circle at 48% 38%, rgba(37,99,235,.16), transparent 42%), radial-gradient(circle at 76% 72%, rgba(96,165,250,.15), transparent 36%)",
+          filter: "blur(8px)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: "46px 28px 34px 48px",
+          borderRadius: 30,
+          backgroundImage:
+            "linear-gradient(rgba(37,99,235,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(37,99,235,.055) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          opacity: 0.55,
+        }}
+      />
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          width: "100%",
+          marginLeft: 0,
+          marginTop: 6,
+          overflow: "hidden",
+          border: "1px solid rgba(147,197,253,.76)",
+          borderRadius: 28,
+          background: "rgba(255,255,255,.94)",
+          boxShadow: "0 26px 70px rgba(37,99,235,.18), 0 8px 28px rgba(15,23,42,.08)",
+          transform: "perspective(1100px) rotateY(-3deg) rotateX(1deg)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid #e6eefb",
+            background: "linear-gradient(180deg, #fff, #f8fbff)",
+            padding: "14px 18px",
+            fontSize: 13,
+          }}
+        >
+          <strong style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#2563eb" }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                background: "#2563eb",
+                boxShadow: "0 0 0 5px rgba(37,99,235,.12)",
+              }}
+            />
+            AI 压力面试进行中
+          </strong>
+          <span className="oc-muted" style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>
+            <span>语音模式</span>
+            <span style={{ color: "#ef4444" }}>●</span>
+            <span>01:17</span>
+          </span>
+          <span
+            style={{
+              border: "1px solid #dde7f8",
+              borderRadius: 999,
+              padding: "7px 12px",
+              color: "#111827",
+              fontWeight: 700,
+              background: "#fff",
+            }}
+          >
+            结束面试
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 205px", minHeight: 370, background: "#f7faff" }}>
+          <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 28, padding: "32px 28px 30px" }}>
+            <div
+              style={{
+                border: "1px solid #dbeafe",
+                borderRadius: 18,
+                background: "#fff",
+                padding: "18px 20px",
+                boxShadow: "0 16px 34px rgba(37,99,235,.10)",
+              }}
+            >
+              <span className="oc-muted" style={{ fontSize: 12 }}>当前问题 · 1/8</span>
+              <h3 style={{ margin: "10px 0 12px", color: "#111827", fontSize: 19 }}>
+                当前问题：请你用 1 分钟介绍一下你自己
+              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {[16, 22, 28, 19, 13, 9, 7, 7].map((height, index) => (
+                  <span
+                    key={index}
+                    style={{
+                      width: 4,
+                      height,
+                      borderRadius: 999,
+                      background: index < 5 ? "#2563eb" : "#dbeafe",
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 70 }}>
+              <HeroAvatar label="David" subLabel="候选人" />
+              <HeroAvatar ai label="AI 面试官" subLabel="正在发言" />
+            </div>
+          </div>
+
+          <div
+            style={{
+              borderLeft: "1px solid #e5eefb",
+              background: "rgba(255,255,255,.9)",
+              padding: 18,
+              fontSize: 12,
+            }}
+          >
+            <strong style={{ color: "#111827" }}>面试实时记录</strong>
+            <HeroRecord time="01:05" role="AI 开场" text="请你用 1 分钟介绍一下你自己" />
+            <HeroRecord time="01:12" role="候选人回答" text="我叫 David，主要做过校园二手交易项目..." />
+            <HeroRecord active time="01:17" role="AI 追问" text="你在这个项目中遇到的最大挑战是什么？" />
+            <a style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, color: "#2563eb", fontWeight: 700 }}>
+              查看完整记录 <ArrowRight size={14} />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <HeroFloatingCard style={{ left: -18, bottom: 104, width: 174 }}>
+        <strong style={{ display: "flex", alignItems: "center", gap: 8, color: "#111827" }}>
+          <MonitorUp size={16} color="#2563eb" />
+          语音模式
+        </strong>
+        <p className="oc-muted" style={{ margin: "9px 0 10px", fontSize: 12 }}>
+          AI 正在倾听并分析回答
+        </p>
+        <div style={{ display: "flex", alignItems: "end", gap: 4, height: 22 }}>
+          {[7, 11, 17, 22, 14, 19, 10, 8].map((height, index) => (
+            <span
+              key={index}
+              style={{
+                width: 4,
+                height,
+                borderRadius: 999,
+                background: index % 2 === 0 ? "#bfdbfe" : "#2563eb",
+              }}
+            />
+          ))}
+        </div>
+      </HeroFloatingCard>
+
+      <HeroFloatingCard style={{ right: -18, bottom: -10, width: 208 }}>
+        <strong style={{ display: "flex", alignItems: "center", gap: 8, color: "#111827" }}>
+          <ClipboardList size={16} color="#2563eb" />
+          面试诊断预览
+        </strong>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+          <div>
+            <div style={{ color: "#2563eb", fontSize: 32, fontWeight: 900 }}>A</div>
+            <span className="oc-muted" style={{ fontSize: 12 }}>综合等级</span>
+          </div>
+          <div
+            style={{
+              width: 62,
+              height: 62,
+              borderRadius: 999,
+              display: "grid",
+              placeItems: "center",
+              color: "#111827",
+              fontWeight: 900,
+              background: "conic-gradient(#2563eb 0 68%, #e5eefb 68% 100%)",
+            }}
+          >
+            <span style={{ width: 46, height: 46, borderRadius: 999, display: "grid", placeItems: "center", background: "#fff" }}>
+              68%
+            </span>
+          </div>
+        </div>
+        <p className="oc-muted" style={{ margin: "12px 0 0", fontSize: 12, lineHeight: 1.6 }}>
+          待提升：数据意识、个人贡献表达
+        </p>
+      </HeroFloatingCard>
+    </div>
+  );
+}
+
+function HeroRecord({
+  active,
+  role,
+  text,
+  time,
+}: {
+  active?: boolean;
+  role: string;
+  text: string;
+  time: string;
+}) {
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", color: active ? "#2563eb" : "#64748b" }}>
+        <span>{time}</span>
+        <strong>{role}</strong>
+      </div>
+      <p className="oc-muted" style={{ margin: "6px 0 0", lineHeight: 1.55 }}>
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function HeroFloatingCard({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        zIndex: 4,
+        border: "1px solid rgba(191,219,254,.9)",
+        borderRadius: 18,
+        background: "rgba(255,255,255,.88)",
+        boxShadow: "0 18px 45px rgba(37,99,235,.16), 0 8px 22px rgba(15,23,42,.08)",
+        backdropFilter: "blur(12px)",
+        padding: 16,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function HeroAvatar({ ai, label, subLabel }: { ai?: boolean; label: string; subLabel: string }) {
+  return (
+    <div style={{ position: "relative", textAlign: "center" }}>
+      <div
+        style={{
+          position: "relative",
+          width: 94,
+          height: 94,
+          borderRadius: 999,
+          display: "grid",
+          placeItems: "center",
+          color: ai ? "#fff" : "#2563eb",
+          background: ai ? "linear-gradient(135deg, #2563eb, #60a5fa)" : "#fff",
+          border: ai ? "8px solid #dbeafe" : "8px solid #e5eefb",
+          boxShadow: "0 16px 38px rgba(37,99,235,.16)",
+        }}
+      >
+        {ai && (
+          <span
+            style={{
+              position: "absolute",
+              inset: -16,
+              border: "2px solid rgba(37,99,235,.35)",
+              borderRadius: 999,
+              animation: "oc-pulse 1.6s ease-out infinite",
+            }}
+          />
+        )}
+        {ai ? <Bot size={38} /> : <BriefcaseBusiness size={34} />}
+      </div>
+      <strong style={{ display: "block", marginTop: 12, color: "#111827" }}>{label}</strong>
+      <span className="oc-tag" style={{ marginTop: 6 }}>
+        {subLabel}
+      </span>
+    </div>
   );
 }
 
