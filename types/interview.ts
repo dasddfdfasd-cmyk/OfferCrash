@@ -1,4 +1,16 @@
 export type CompanyStyle = "bytedance" | "tencent";
+export type InterviewSourceMode = "resume" | "instant";
+export type InstantRole = "product" | "operation" | "developer";
+
+export interface InstantRoleConfig {
+  role: InstantRole;
+  label: string;
+  title: string;
+  description: string;
+  firstQuestion: string;
+  userMock: string;
+  riskPoints: string[];
+}
 
 export type MeetingStatus =
   | "device_check"
@@ -81,6 +93,8 @@ export interface NextQuestionRequest {
   interviewRecords: InterviewRecord[];
   currentStage?: string;
   roundIndex: number;
+  interviewMode?: InterviewSourceMode;
+  instantRole?: InstantRole;
 }
 
 export interface NextQuestionResponse {

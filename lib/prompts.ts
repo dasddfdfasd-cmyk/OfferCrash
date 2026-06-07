@@ -61,7 +61,7 @@ export function buildReportGenerationPrompt(
   const { candidateProfile, companyStyle, interviewRecords, duration } = params;
 
   return `
-你是 OfferCrash 的面试诊断 Agent。请基于候选人档案、公司风格、面试记录和面试时长，生成产品经理校招压力面试诊断报告。
+你是 OfferCrash 的面试诊断 Agent。请基于候选人档案、公司风格、面试记录和面试时长，生成${candidateProfile.targetRole}校招压力面试诊断报告。
 
 硬性要求：
 1. 只输出严格 JSON 对象，不要输出 markdown，不要输出额外解释，不要用代码块包裹 JSON。
@@ -131,9 +131,21 @@ export function buildNextQuestionPrompt(params: NextQuestionRequest): string {
   const lastUserAnswer = [...interviewRecords]
     .reverse()
     .find((record) => record.role === "user");
+  const roleFocus =
+    candidateProfile.targetRole === "运营"
+      ? "运营目标、用户增长路径、活动策略、内容策略、转化数据、复盘结论"
+      : candidateProfile.targetRole === "开发"
+        ? "技术选型、系统设计、关键难点、Bug 定位、性能优化、代码质量、个人开发贡献"
+        : "用户需求、产品决策、数据指标、个人贡献、项目结果";
+  const interviewerRole =
+    candidateProfile.targetRole === "运营"
+      ? "运营岗位"
+      : candidateProfile.targetRole === "开发"
+        ? "开发岗位"
+        : "产品经理";
 
   return `
-你是一名产品经理校招压力面试官。
+你是一名${interviewerRole}校招压力面试官。
 你不是聊天助手。
 你必须根据候选人的上一轮真实回答，生成下一轮面试追问。
 每次只问一个问题。
@@ -143,13 +155,15 @@ export function buildNextQuestionPrompt(params: NextQuestionRequest): string {
 不要输出长段解释。
 
 面试目标：
-考察候选人在产品经理岗位中的：
+考察候选人在${interviewerRole}中的：
 - 结构化表达
 - 项目理解深度
-- 用户洞察
 - 数据意识
 - 个人贡献
 - 抗压表现
+
+当前岗位重点追问：
+${roleFocus}
 
 追问规则：
 1. 用户说“提升、优化、改善”，必须追问具体指标、统计口径、前后对比。

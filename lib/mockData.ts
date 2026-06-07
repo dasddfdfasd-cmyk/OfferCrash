@@ -1,9 +1,85 @@
 import type {
   CandidateProfile,
+  InstantRole,
+  InstantRoleConfig,
   InterviewRecord,
   InterviewReport,
   InterviewTurn,
 } from "@/types/interview";
+
+export const instantRoleConfigs: Record<InstantRole, InstantRoleConfig> = {
+  product: {
+    role: "product",
+    label: "产品经理",
+    title: "产品经理即兴压力面试",
+    description: "重点考察用户洞察、需求判断、数据意识、项目深度和个人贡献。",
+    firstQuestion:
+      "你好，我们开始一场产品经理校招即兴压力面试。请你先用 1 分钟介绍一下自己，并选择一个你最想讲的产品项目经历。",
+    userMock:
+      "你好，我是深圳大学的学生，之前做过一个校园二手交易小程序项目。我主要负责用户调研、需求分析和原型设计。",
+    riskPoints: [
+      "项目经历表达是否具体",
+      "用户需求判断是否有依据",
+      "个人贡献是否清楚",
+      "数据结果是否明确",
+      "产品决策逻辑是否完整",
+    ],
+  },
+  operation: {
+    role: "operation",
+    label: "运营",
+    title: "运营即兴压力面试",
+    description: "重点考察用户增长、活动策划、内容运营、数据复盘和执行落地能力。",
+    firstQuestion:
+      "你好，我们开始一场运营岗位即兴压力面试。请你先用 1 分钟介绍一下自己，并选择一个你做过的运营项目或活动案例。",
+    userMock:
+      "你好，我是深圳大学的学生，之前做过一次校园社群运营项目。我主要负责活动策划、内容发布和用户转化。",
+    riskPoints: [
+      "运营目标是否清晰",
+      "活动策略是否有依据",
+      "用户增长数据是否明确",
+      "复盘指标是否完整",
+      "个人执行贡献是否清楚",
+    ],
+  },
+  developer: {
+    role: "developer",
+    label: "开发",
+    title: "开发即兴压力面试",
+    description: "重点考察技术选型、工程实现、问题定位、项目复杂度和代码质量意识。",
+    firstQuestion:
+      "你好，我们开始一场开发岗位即兴压力面试。请你先用 1 分钟介绍一下自己，并选择一个你做过的技术项目。",
+    userMock:
+      "你好，我是深圳大学的学生，之前做过一个基于 Next.js 的 AI 面试产品。我主要负责前端页面、接口联调和部分功能实现。",
+    riskPoints: [
+      "技术选型理由是否清楚",
+      "项目复杂度是否真实",
+      "个人开发贡献是否明确",
+      "问题定位和解决过程是否具体",
+      "工程质量和可维护性是否有意识",
+    ],
+  },
+};
+
+const instantCandidateSummaries: Record<InstantRole, string> = {
+  product:
+    "候选人选择产品经理即兴面试模式，尚未上传简历。AI 将通过自我介绍和项目经历补充候选人背景，并重点考察需求分析、用户洞察、数据意识和个人贡献。",
+  operation:
+    "候选人选择运营即兴面试模式，尚未上传简历。AI 将通过自我介绍和运营案例补充候选人背景，并重点考察活动策划、用户增长、内容运营、数据复盘和执行能力。",
+  developer:
+    "候选人选择开发即兴面试模式，尚未上传简历。AI 将通过自我介绍和技术项目补充候选人背景，并重点考察技术选型、工程实现、问题定位、项目复杂度和代码质量意识。",
+};
+
+export function buildInstantCandidateProfile(role: InstantRole): CandidateProfile {
+  const roleConfig = instantRoleConfigs[role];
+
+  return {
+    targetRole: roleConfig.label,
+    candidateSummary: instantCandidateSummaries[role],
+    mainProjects: [],
+    overallRiskPoints: roleConfig.riskPoints,
+  };
+}
 
 export const mockCandidateProfile: CandidateProfile = {
   targetRole: "产品经理",

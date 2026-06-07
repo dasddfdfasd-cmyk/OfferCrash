@@ -31,18 +31,29 @@ import {
   getCandidateProfile,
   getCompanyStyle,
   isDemoMode,
+  readJson,
+  readText,
   writeJson,
   writeText,
 } from "@/components/offercrash-shared";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { getLocalFallbackQuestion } from "@/lib/fallbackQuestion";
-import { mockCandidateProfile, mockInterviewTurns, mockReport } from "@/lib/mockData";
+import {
+  buildInstantCandidateProfile,
+  instantRoleConfigs,
+  mockCandidateProfile,
+  mockInterviewTurns,
+  mockReport,
+} from "@/lib/mockData";
 import type {
   CandidateProfile,
   CompanyStyle,
+  InstantRole,
   InterviewRecord,
   InterviewReport,
+  InterviewSourceMode,
+  InterviewTurn,
 } from "@/types/interview";
 
 type VoiceMeetingStatus =
@@ -194,9 +205,27 @@ export default function MeetingPage() {
 
   const companyStyle = useMemo<CompanyStyle>(() => getCompanyStyle(), []);
   const selectedCompany = companyProfiles[companyStyle];
-  const candidateProfile = useMemo<CandidateProfile>(
-    () => getCandidateProfile() ?? mockCandidateProfile,
+  const interviewSourceMode = useMemo<InterviewSourceMode>(
+    () =>
+      readText(STORAGE_KEYS.interviewMode, "resume") === "instant"
+        ? "instant"
+        : "resume",
     [],
+  );
+  const instantRole = useMemo<InstantRole>(() => {
+    const value = readText(STORAGE_KEYS.instantRole, "product");
+    return value === "operation" || value === "developer" ? value : "product";
+  }, []);
+  const instantRoleConfig = instantRoleConfigs[instantRole];
+  const candidateProfile = useMemo<CandidateProfile>(
+    () =>
+      interviewSourceMode === "instant"
+        ? readJson(
+            STORAGE_KEYS.candidateProfile,
+            buildInstantCandidateProfile(instantRole),
+          )
+        : getCandidateProfile() ?? mockCandidateProfile,
+    [instantRole, interviewSourceMode],
   );
 
   const currentQuestionRef = useRef(currentQuestion);
@@ -512,6 +541,8 @@ export default function MeetingPage() {
             interviewRecords: records,
             roundIndex,
             voiceMode: interviewModeRef.current === "voice",
+            interviewMode: interviewSourceMode,
+            instantRole,
           }),
         });
         if (timeout !== null) {
@@ -589,7 +620,14 @@ export default function MeetingPage() {
         setMeetingStatus("ai_speaking");
       }
     },
-    [candidateProfile, companyStyle, generateReport, speakQuestion],
+    [
+      candidateProfile,
+      companyStyle,
+      generateReport,
+      instantRole,
+      interviewSourceMode,
+      speakQuestion,
+    ],
   );
 
   const finalizeUserAnswer = useCallback(
@@ -757,7 +795,21 @@ export default function MeetingPage() {
 
   const initializeInterview = useCallback(
     (mode: InterviewMode) => {
-      const firstTurn = mockInterviewTurns[0];
+      const resumeFirstTurn = mockInterviewTurns[0];
+      const firstTurn: InterviewTurn | undefined =
+        interviewSourceMode === "instant"
+          ? {
+              stage:
+                instantRole === "operation"
+                  ? "运营即兴开场"
+                  : instantRole === "developer"
+                    ? "开发即兴开场"
+                    : "产品即兴开场",
+              type: "自我介绍与项目选择",
+              ai: instantRoleConfig.firstQuestion,
+              userMock: instantRoleConfig.userMock,
+            }
+          : resumeFirstTurn;
       if (!firstTurn) return;
 
       clearAnswerTimers();
@@ -795,7 +847,14 @@ export default function MeetingPage() {
         setMeetingStatus("waiting_user");
       }
     },
-    [clearAnswerTimers, speakQuestion, speechRecognition, speechSynthesis],
+    [
+      clearAnswerTimers,
+      instantRole,
+      instantRoleConfig,
+      interviewSourceMode,
+      speechRecognition,
+      speechSynthesis,
+    ],
   );
 
   const submitTextAnswer = async () => {
@@ -1008,6 +1067,26 @@ export default function MeetingPage() {
           >
             面试开始 {formatClock(elapsedTime)}
           </div>
+          {interviewSourceMode === "instant" && (
+            <div
+              style={{
+                borderBottom: "1px solid #dbeafe",
+                background: "#f8fbff",
+                padding: "12px 20px",
+                color: "#475569",
+                fontSize: 13,
+                lineHeight: 1.7,
+              }}
+            >
+              <strong style={{ display: "block", color: "#1d4ed8" }}>
+                当前模式：即兴面试
+              </strong>
+              <span>当前岗位：{instantRoleConfig.label}</span>
+              <span style={{ display: "block" }}>
+                无需上传简历，AI 将根据你的现场回答动态追问。
+              </span>
+            </div>
+          )}
           <div className="oc-record-list">
             {interviewRecords.map((record, index) => (
               <article className="oc-record" key={`${record.role}-${record.roundIndex}-${index}`}>

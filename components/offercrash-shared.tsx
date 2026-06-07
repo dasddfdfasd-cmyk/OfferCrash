@@ -16,6 +16,7 @@ import {
   Play,
   RefreshCw,
   ShieldQuestion,
+  Sparkles,
   UploadCloud,
 } from "lucide-react";
 
@@ -33,6 +34,8 @@ export const FALLBACK_PROFILE_NOTICE =
 
 export const STORAGE_KEYS = {
   candidateProfile: "offercrash_candidateProfile",
+  interviewMode: "offercrash_interviewMode",
+  instantRole: "offercrash_instantRole",
   profileFallback: "offercrash_profileFallback",
   companyStyle: "offercrash_companyStyle",
   report: "offercrash_report",
@@ -117,6 +120,15 @@ export function writeText(key: string, value: string) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, value);
+  } catch {
+    // Keep the flow usable if localStorage is unavailable.
+  }
+}
+
+export function removeStoredValue(key: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(key);
   } catch {
     // Keep the flow usable if localStorage is unavailable.
   }
@@ -274,6 +286,7 @@ export function SecondaryButton({
 }
 
 export function HomePage() {
+  const router = useRouter();
   const features = [
     [
       "AI 主动提问",
@@ -292,6 +305,17 @@ export function HomePage() {
     ],
   ] as const;
 
+  const startResumeInterview = () => {
+    writeText(STORAGE_KEYS.interviewMode, "resume");
+    removeStoredValue(STORAGE_KEYS.instantRole);
+    router.push("/upload");
+  };
+
+  const startInstantInterview = () => {
+    writeText(STORAGE_KEYS.interviewMode, "instant");
+    router.push("/config");
+  };
+
   return (
     <AppFrame>
       <PageShell>
@@ -305,9 +329,12 @@ export function HomePage() {
               从简历解析、语音面试、动态追问到诊断报告，OfferCrash 帮助产品经理候选人在正式面试前完成一次真实的高压预演。
             </p>
             <div className="oc-actions">
-              <PrimaryButton href="/upload" icon={<Play size={18} />}>
+              <PrimaryButton onClick={startResumeInterview} icon={<Play size={18} />}>
                 开始压力面试
               </PrimaryButton>
+              <SecondaryButton onClick={startInstantInterview} icon={<Sparkles size={17} />}>
+                即兴面试
+              </SecondaryButton>
               <span
                 className="oc-muted"
                 style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
@@ -782,6 +809,8 @@ export function ProfileSummary({
 export function useGoProfileWithMock() {
   const router = useRouter();
   return () => {
+    writeText(STORAGE_KEYS.interviewMode, "resume");
+    removeStoredValue(STORAGE_KEYS.instantRole);
     writeJson(STORAGE_KEYS.candidateProfile, mockCandidateProfile);
     writeText(STORAGE_KEYS.profileFallback, "true");
     router.push("/profile");
