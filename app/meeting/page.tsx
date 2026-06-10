@@ -517,6 +517,13 @@ export default function MeetingPage() {
     });
   }, [companyStyle, selectedVoiceURI, speechSynthesis]);
 
+  const continueWithNextQuestion = useCallback(() => {
+    finalizingRef.current = false;
+    setMeetingStatus(
+      interviewModeRef.current === "voice" ? "ai_speaking" : "waiting_user",
+    );
+  }, []);
+
   const generateNextQuestion = useCallback(
     async (records: InterviewRecord[]) => {
       const roundIndex = currentTurnIndexRef.current;
@@ -576,7 +583,7 @@ export default function MeetingPage() {
           return;
         }
 
-        setMeetingStatus("ai_speaking");
+        continueWithNextQuestion();
       } catch (error) {
         if (timeout !== null) {
           window.clearTimeout(timeout);
@@ -617,12 +624,13 @@ export default function MeetingPage() {
           return;
         }
 
-        setMeetingStatus("ai_speaking");
+        continueWithNextQuestion();
       }
     },
     [
       candidateProfile,
       companyStyle,
+      continueWithNextQuestion,
       generateReport,
       instantRole,
       interviewSourceMode,
@@ -1134,6 +1142,16 @@ export default function MeetingPage() {
                   disabled={meetingStatus !== "waiting_user"}
                   placeholder="请输入你的回答，文字模式下点击发送进入下一轮。"
                   onChange={(event) => setTextAnswer(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      void submitTextAnswer();
+                    }
+                  }}
                   style={{
                     minHeight: 96,
                     resize: "vertical",
