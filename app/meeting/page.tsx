@@ -238,6 +238,7 @@ export default function MeetingPage() {
   const interviewModeRef = useRef(interviewMode);
   const interviewRecordsRef = useRef<InterviewRecord[]>([]);
   const meetingStatusRef = useRef<VoiceMeetingStatus>(meetingStatus);
+  const recordListRef = useRef<HTMLDivElement | null>(null);
   const noSpeechTimerRef = useRef<number | null>(null);
   const maxAnswerTimerRef = useRef<number | null>(null);
   const softSilenceTimerRef = useRef<number | null>(null);
@@ -295,6 +296,20 @@ export default function MeetingPage() {
   useEffect(() => {
     interviewRecordsRef.current = interviewRecords;
   }, [interviewRecords]);
+
+  useEffect(() => {
+    const recordList = recordListRef.current;
+    if (!recordList) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      recordList.scrollTo({
+        top: recordList.scrollHeight,
+        behavior: "smooth",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentUserTranscript, interviewRecords.length, meetingStatus]);
 
   useEffect(() => {
     if (thinkingStepTimerRef.current !== null) {
@@ -1095,7 +1110,7 @@ export default function MeetingPage() {
               </span>
             </div>
           )}
-          <div className="oc-record-list">
+          <div className="oc-record-list" ref={recordListRef}>
             {interviewRecords.map((record, index) => (
               <article className="oc-record" key={`${record.role}-${record.roundIndex}-${index}`}>
                 <span className={`oc-record-dot ${record.role === "user" ? "is-user" : ""}`} />
